@@ -154,7 +154,24 @@ describe('answering a question', () => {
     await ask('Hello');
 
     expect(failover.requests[0]!.request.tools.map((tool) => tool.name)).toEqual(['get_overview']);
-    expect(failover.requests[0]!.request.maxTokens).toBe(700);
+    expect(failover.requests[0]!.request.maxTokens).toBe(1500);
+  });
+});
+
+describe('an answer that ran out of room', () => {
+  it('says so instead of passing half an answer off as a whole one, and does not remember it', async () => {
+    const failover = aFailover(
+      { content: 'Here is the list:', toolCalls: [], truncated: true },
+      said('Full answer.'),
+    );
+    const { ask } = setup(failover);
+
+    const first = await ask('Q');
+
+    expect(first.answer).toBe(
+      'Here is the list:\n\n(This answer was cut off because it was too long. Ask a narrower question.)',
+    );
+    expect((await ask('Q')).answer).toBe('Full answer.');
   });
 });
 

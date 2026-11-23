@@ -44,6 +44,12 @@ describe('loadAssistantConfig', () => {
     });
   });
 
+  it('asks Gemini for little hidden reasoning, which is faster and leaves room for the answer', () => {
+    const config = loadAssistantConfig({ GEMINI_API_KEY: 'm-key' });
+
+    expect(config.providers[0]!.extraBody).toEqual({ reasoning_effort: 'low' });
+  });
+
   it('follows the order in ASSISTANT_PROVIDERS and leaves out any provider not listed', () => {
     const config = loadAssistantConfig({
       ASSISTANT_PROVIDERS: 'openrouter, groq',

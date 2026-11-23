@@ -200,6 +200,54 @@ describe('createOpenAiCompatibleClient: the reply', () => {
   });
 });
 
+describe('createOpenAiCompatibleClient: a reply that ran out of room', () => {
+  it('marks it, so it is never presented as complete', async () => {
+    const { fetchFn } = aFetch(() =>
+      Response.json({
+        choices: [
+          { finish_reason: 'length', message: { role: 'assistant', content: 'Here is the list:' } },
+        ],
+      }),
+    );
+
+    expect(await client(fetchFn).complete(request)).toEqual({
+      content: 'Here is the list:',
+      toolCalls: [],
+      truncated: true,
+    });
+  });
+
+  it('does not mark a reply that finished normally', async () => {
+    const { fetchFn } = aFetch(() =>
+      Response.json({ choices: [{ finish_reason: 'stop', message: { content: 'Done.' } }] }),
+    );
+
+    expect(await client(fetchFn).complete(request)).not.toHaveProperty('truncated');
+  });
+});
+
+describe('createOpenAiCompatibleClient: provider-specific settings', () => {
+  it('adds them to the request, but never lets them replace the model or the messages', async () => {
+    const { fetchFn, calls } = aFetch(() => answer('ok'));
+    const tuned = createOpenAiCompatibleClient({
+      id: 'gemini',
+      label: 'Gemini',
+      baseUrl: 'https://api.example.test/v1',
+      apiKey: SECRET,
+      model: 'test-model',
+      extraBody: { reasoning_effort: 'low', model: 'someone-else', messages: [] },
+      fetch: fetchFn,
+    });
+
+    await tuned.complete(request);
+
+    const body = JSON.parse(String(calls[0]!.init.body));
+    expect(body.reasoning_effort).toBe('low');
+    expect(body.model).toBe('test-model');
+    expect(body.messages).toHaveLength(2);
+  });
+});
+
 describe('createOpenAiCompatibleClient: when it goes wrong', () => {
   it('reports a rate limit with the wait the provider asked for', async () => {
     const { fetchFn } = aFetch(
