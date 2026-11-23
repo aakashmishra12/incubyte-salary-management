@@ -29,6 +29,7 @@ Measured on the development laptop with live providers, 24 Nov 2026. These depen
 | Who is paid furthest above their peers? | Groq (gpt-oss-120b) | 1.6 s |
 | What does a level 3 engineer earn in each country? | Groq (gpt-oss-120b) | 1.5 s |
 | How much do we spend on salaries in each country? | Gemini (3.5 Flash, low reasoning) | 7.1 s |
+| How many active employees do we have in Japan? | OpenRouter (free router), after Groq and Gemini were deliberately refused | 2.5 s |
 | The same question again | cache | under 5 ms |
 
 A question takes two model calls: one to ask for a tool, and one to write the answer. The tools themselves take under 10 ms, the same as the screens.

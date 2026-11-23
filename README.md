@@ -81,7 +81,7 @@ The assistant is optional. With no key set, the button is not shown and nothing 
 |---|---|---|
 | Groq | 1,000 requests a day and 8,000 tokens a minute, answers in about 1.5 seconds | console.groq.com/keys |
 | Gemini | 20 requests a day and 5 a minute on the main Flash models, and sometimes "high demand" errors | aistudio.google.com/apikey |
-| OpenRouter | 50 requests a day on free models, 1,000 after buying credits | openrouter.ai/keys |
+| OpenRouter | 50 requests a day on free models, 1,000 after buying credits. Its free router picks any free model that supports tools, and answered in about 1.5 seconds | openrouter.ai/keys |
 | NVIDIA | About 40 requests a minute, for trying things out | build.nvidia.com |
 | Ollama | A model on your own machine, no key and no limit | `OLLAMA_MODEL=...` |
 
