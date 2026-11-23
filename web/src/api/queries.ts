@@ -8,6 +8,13 @@ import {
   markEmployeeLeft,
   updateEmployee,
 } from './employees.ts';
+import {
+  fetchBreakdown,
+  fetchOutliers,
+  fetchOverview,
+  type BreakdownParams,
+  type OutlierParams,
+} from './insights.ts';
 import type {
   EmployeeChanges,
   EmployeeDetail,
@@ -37,6 +44,28 @@ export function useEmployees(params: URLSearchParams) {
 
 export function useEmployee(id: number) {
   return useQuery({ queryKey: ['employee', id], queryFn: () => fetchEmployee(id) });
+}
+
+// Every insight key starts with 'insights', so one call can mark them all as out of date.
+
+export function useOverview() {
+  return useQuery({ queryKey: ['insights', 'overview'], queryFn: fetchOverview });
+}
+
+export function useBreakdown(params: BreakdownParams) {
+  return useQuery({
+    queryKey: ['insights', 'breakdown', params],
+    queryFn: () => fetchBreakdown(params),
+    placeholderData: keepPreviousData,
+  });
+}
+
+export function useOutliers(params: OutlierParams) {
+  return useQuery({
+    queryKey: ['insights', 'outliers', params],
+    queryFn: () => fetchOutliers(params),
+    placeholderData: keepPreviousData,
+  });
 }
 
 /**
