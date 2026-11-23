@@ -16,6 +16,8 @@ export interface ProviderClientOptions {
   /** Not needed for a local Ollama. */
   apiKey?: string | undefined;
   model: string;
+  /** Settings only this provider understands, such as how much to think. They never replace the core fields. */
+  extraBody?: Record<string, unknown> | undefined;
   /** Replaced by a fake in tests. */
   fetch?: typeof fetch;
   timeoutMs?: number;
@@ -31,6 +33,7 @@ export function createOpenAiCompatibleClient({
   baseUrl,
   apiKey,
   model,
+  extraBody,
   fetch: fetchFn = fetch,
   timeoutMs = 30_000,
 }: ProviderClientOptions): ModelClient {
@@ -43,6 +46,8 @@ export function createOpenAiCompatibleClient({
         ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
       },
       body: JSON.stringify({
+        // First, so that nothing in it can replace the fields below.
+        ...extraBody,
         model,
         // Zero: the same question should give the same tool calls as far as possible.
         temperature: 0,
@@ -151,8 +156,10 @@ interface RawToolCall {
 
 /** Reads the first choice of a reply. Anything unexpected counts as the provider being unavailable. */
 function parseReply(body: unknown, label: string, providerId: ProviderId): ModelReply {
-  const message = (body as { choices?: { message?: Record<string, unknown> }[] })?.choices?.[0]
-    ?.message;
+  const choice = (
+    body as { choices?: { finish_reason?: unknown; message?: Record<string, unknown> }[] }
+  )?.choices?.[0];
+  const message = choice?.message;
 
   const content =
     typeof message?.content === 'string' && message.content.trim() !== ''
@@ -179,5 +186,8 @@ function parseReply(body: unknown, label: string, providerId: ProviderId): Model
   if (content === null && toolCalls.length === 0) {
     throw new ProviderError('unavailable', `${label} sent an empty reply`);
   }
-  return { content, toolCalls };
+  // "length" means the model hit the token limit and stopped, possibly in the middle of a sentence.
+  return choice?.finish_reason === 'length'
+    ? { content, toolCalls, truncated: true }
+    : { content, toolCalls };
 }

@@ -8,6 +8,8 @@ export interface ProviderConfig {
   apiKey?: string | undefined;
   model: string;
   dailyLimit?: number | undefined;
+  /** Settings only this provider understands. */
+  extraBody?: Record<string, unknown> | undefined;
 }
 
 export interface AssistantConfig {
@@ -29,6 +31,9 @@ const KNOWN_PROVIDERS = {
     defaultModel: 'gemini-3.5-flash',
     limitVariable: 'GEMINI_DAILY_LIMIT',
     defaultDailyLimit: 18,
+    // Gemini 3 thinks before it answers, and the thinking counts towards the token limit.
+    // Low effort is quicker and leaves room for the answer.
+    extraBody: { reasoning_effort: 'low' },
   },
   groq: {
     label: 'Groq',
@@ -39,6 +44,7 @@ const KNOWN_PROVIDERS = {
     defaultModel: 'openai/gpt-oss-120b',
     limitVariable: 'GROQ_DAILY_LIMIT',
     defaultDailyLimit: 500,
+    extraBody: undefined,
   },
   openrouter: {
     label: 'OpenRouter',
@@ -50,6 +56,7 @@ const KNOWN_PROVIDERS = {
     limitVariable: 'OPENROUTER_DAILY_LIMIT',
     // The free tier allows 50 requests a day. Staying under it leaves room for slips.
     defaultDailyLimit: 45,
+    extraBody: undefined,
   },
   ollama: {
     label: 'Ollama (local)',
@@ -59,6 +66,7 @@ const KNOWN_PROVIDERS = {
     defaultModel: undefined,
     limitVariable: undefined,
     defaultDailyLimit: undefined,
+    extraBody: undefined,
   },
 } as const;
 
@@ -98,6 +106,7 @@ export function loadAssistantConfig(env: Record<string, string | undefined>): As
         known.limitVariable && known.defaultDailyLimit
           ? positiveInteger(env[known.limitVariable], known.defaultDailyLimit)
           : undefined,
+      extraBody: known.extraBody,
     });
   }
 

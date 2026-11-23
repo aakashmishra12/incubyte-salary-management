@@ -7,7 +7,10 @@ import type { UsageLimiter } from './usageLimiter.ts';
 const MAX_TOOL_ROUNDS = 4;
 const MAX_TOOL_CALLS_PER_ROUND = 4;
 const HISTORY_MESSAGES = 6;
-const MAX_ANSWER_TOKENS = 700;
+// Room for the answer and for any hidden thinking a model does first. Thinking counts against it.
+const MAX_ANSWER_TOKENS = 1500;
+
+const CUT_OFF = '\n\n(This answer was cut off because it was too long. Ask a narrower question.)';
 
 const GAVE_UP =
   'I could not answer that within my limits. Try a narrower question, for example about one country or one department.';
@@ -95,7 +98,7 @@ export function createAssistantService(deps: AssistantDeps) {
 
   async function converse(
     input: AskInput,
-  ): Promise<Omit<AssistantAnswer, 'cached' | 'remainingThisHour'>> {
+  ): Promise<Omit<AssistantAnswer, 'cached' | 'remainingThisHour'> & { complete: boolean }> {
     const messages: ChatMessage[] = [
       { role: 'system', content: systemPrompt(clock().toISOString().slice(0, 10)) },
       ...input.history
@@ -116,10 +119,12 @@ export function createAssistantService(deps: AssistantDeps) {
 
       if (reply.toolCalls.length === 0) {
         return {
-          answer: reply.content ?? GAVE_UP,
+          // A cut-off answer must never look finished. Salary figures that stop halfway mislead.
+          answer: reply.truncated ? `${reply.content ?? ''}${CUT_OFF}` : (reply.content ?? GAVE_UP),
           sources,
           provider: providerId,
           providerLabel: labelOf(providerId),
+          complete: !reply.truncated,
         };
       }
 
@@ -145,6 +150,7 @@ export function createAssistantService(deps: AssistantDeps) {
       sources,
       provider: providerId,
       providerLabel: providerId ? labelOf(providerId) : null,
+      complete: false,
     };
   }
 
@@ -168,18 +174,18 @@ export function createAssistantService(deps: AssistantDeps) {
       const decision = limiter.tryUse(input.visitorId);
       if (!decision.allowed) throw new UsageLimitError(decision.reason, decision.retryAfterSeconds);
 
-      let answer: Omit<AssistantAnswer, 'cached' | 'remainingThisHour'>;
+      let outcome: Awaited<ReturnType<typeof converse>>;
       try {
-        answer = await converse(input);
+        outcome = await converse(input);
       } catch (error) {
         // No provider could answer, so this question should not count against anyone.
         limiter.refund(input.visitorId);
         throw error;
       }
 
-      // An answer that gave up is not worth remembering.
-      if (canCache && answer.answer !== GAVE_UP)
-        cache.set(input.question, version, provider, answer);
+      // An answer that gave up, or was cut off, is not worth remembering.
+      const { complete, ...answer } = outcome;
+      if (canCache && complete) cache.set(input.question, version, provider, answer);
 
       return { ...answer, cached: false, remainingThisHour: limiter.remaining(input.visitorId) };
     },

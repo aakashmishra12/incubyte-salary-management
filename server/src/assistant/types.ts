@@ -39,6 +39,8 @@ export interface ModelRequest {
 export interface ModelReply {
   content: string | null;
   toolCalls: ToolCall[];
+  /** Set when the model ran out of room and stopped mid-answer. Absent otherwise. */
+  truncated?: boolean;
 }
 
 /** Anything that can answer a ModelRequest: a real provider, or a fake in a test. */
