@@ -68,9 +68,15 @@ export function findOutliers(
   return outliers;
 }
 
-/** Splits records into peer groups, keeping the order in which each group first appears. */
-function groupByPeers(records: readonly PayRecord[]): PayRecord[][] {
-  const groups = new Map<string, PayRecord[]>();
+/**
+ * Splits records into peer groups, keeping the order in which each group first appears.
+ * <T extends ...> means: works for any record that has at least these three fields,
+ * and gives back the same kind of record it was given.
+ */
+export function groupByPeers<T extends Pick<PayRecord, 'country' | 'department' | 'level'>>(
+  records: readonly T[],
+): T[][] {
+  const groups = new Map<string, T[]>();
 
   for (const record of records) {
     const key = `${record.country}|${record.department}|${record.level}`;
