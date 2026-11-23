@@ -16,6 +16,17 @@ if (seedIfEmpty(db, DEFAULT_SEED, SEED_TIMESTAMP)) {
 // The web app is built into web/dist. In development it does not exist, and Vite serves the UI.
 const webDir = existsSync(config.webDir) ? config.webDir : undefined;
 
-createApp({ db, webDir }).listen(config.port, () => {
+const server = createApp({ db, webDir }).listen(config.port, () => {
   console.log(`Salary Management listening on http://localhost:${config.port}`);
 });
+
+// When the process is asked to stop (Ctrl+C, or the host restarting it), stop taking
+// requests, let the ones in progress finish, and close the database file cleanly.
+for (const signal of ['SIGINT', 'SIGTERM'] as const) {
+  process.on(signal, () => {
+    server.close(() => {
+      db.close();
+      process.exit(0);
+    });
+  });
+}
