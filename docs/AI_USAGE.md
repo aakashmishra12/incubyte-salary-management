@@ -20,6 +20,7 @@ Tool: Claude Code (Anthropic) in VS Code. The standing instructions I gave it ar
 | Slice 6. Insights | To build the three insights from the spec. | Reporting how many employees could not be rated, and showing local currency only when a group shares one. | Tests, and the page opened in the browser against the 10,000 seeded employees. |
 | Slice 7. Hardening | To add security headers, a clean shutdown, a measurement script and the architecture and performance documents. | The measured numbers in `docs/PERFORMANCE.md`. | `npm run measure`, run on the development laptop. |
 | Design | To apply one written design language across the app. I chose the Vercel-inspired reference in `docs/design/DESIGN.md`. | One theme file that every screen reads, and leaving out the gradient and pill buttons because the reference reserves them for marketing pages. | All 64 UI tests passed unchanged, and each screen was checked in the browser. |
+| Slice 8. Pay assistant | To build an assistant that answers pay questions with a free model API, with automatic switching between providers and very careful limits. I chose Groq, Gemini, OpenRouter and NVIDIA as candidates, and asked for at least two so one can take over when the other runs out. | The rule that the model can only call fixed read-only tools. I rejected letting it write SQL or giving it the whole table. I also set the limits and kept the keys in a git-ignored file. | Every provider fact (limits, model names, behaviour) was tested with a live key, and the answers were compared with the Insights page. |
 
 ## What the AI got wrong, and how it was caught
 | What happened | How it was caught | What changed |
@@ -28,6 +29,11 @@ Tool: Claude Code (Anthropic) in VS Code. The standing instructions I gave it ar
 | A date check reported the same field twice for one mistake. | An API test that expects exactly one issue per wrong field. | The two checks became one. |
 | A theme setting that older MUI versions accepted does not exist in MUI 9. | The type check failed. | The supported `variants` form is used instead. |
 | A UI test looked for a date that appears twice on the page. | The test failed on its first run against the real page. | The test now looks inside the details panel only. |
+| The first version of the assistant stopped an answer after its first line while looking finished. | Asking the live assistant a real question and comparing it with the Insights page. | A reply that stopped at the token limit is detected, marked as cut off and never cached. Gemini is asked for low reasoning effort. |
+| The code did not send Gemini's thought signature back with tool results, which Gemini 3 refuses. | A live call with the tool result sent back without it returned a 400. | The signature is kept and sent back to Gemini only, with a documented placeholder for tool calls another provider made. |
+| A 400 from a provider blocked it for an hour. | Reasoning about what a 400 means: one request was refused, not the provider broken. | A 400 now cools the provider for five minutes and logs it. Only a wrong key or model blocks it for an hour. |
+| The AI assumed the free Gemini limits were generous. They are 20 requests a day on the main Flash models. | Reading the real rate limit page in AI Studio. | Daily budgets come from measured limits, and Groq is first in the default order. |
+| A test used dollars where its helper multiplied by 100, so the tool reported a ratio of 1,600. | The test failed and the diff showed 1600. | The test data was corrected. The tool was right. |
 
 ## How I checked the AI's work
 - Every behaviour has a test that was seen to fail first.

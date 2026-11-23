@@ -4,6 +4,7 @@ A web app for the HR Manager of ACME, a company with 10,000 employees in eight c
 
 1. **Manage salary data:** find anyone in seconds, see their pay and how it changed, record a new salary with a date and a reason, add joiners and mark leavers.
 2. **Answer questions about pay:** what the company spends and where, what a role typically earns in each country, and who is paid far above or below their peers.
+3. **Ask in plain words:** a pay assistant answers questions such as "who is paid furthest above their peers in India?", using the same tested figures as the screens, and shows what each answer is based on.
 
 Built as a take-home assessment for Incubyte.
 
@@ -34,6 +35,7 @@ The commit history is meant to be read from the first commit: documents first, t
 | **Employees** | Browse 10,000 employees 25 at a time. Search by name, email or employee ID. Filter by country, department, level and status. Sort by any main column, including salary compared in USD. The filters live in the address bar, so a view can be bookmarked. |
 | **Employee** | See the details, the current salary in local currency with the approximate USD amount, and the full salary history. Change the salary with an effective date and a reason. Correct details. Mark as left. |
 | **Add employee** | Add a joiner. The employee ID is assigned, and the salary is asked for in the currency of the chosen country. |
+| **Pay assistant** | A round button at the bottom right opens a panel. Ask about pay in plain words, or click an example. Each answer shows its sources and which model gave it. Choose a model by hand, or leave it on Auto. The button appears only when a provider key is set. |
 | **Insights** | Headcount and annual cost overall and per country. Lowest, median, average and highest salary by country, department or level, narrowed to any combination. A list of pay outliers with the reason for each flag. |
 
 ## How to run
@@ -65,10 +67,31 @@ npm start
 |---|---|---|
 | `PORT` | `3000` | The port the server listens on. |
 | `DATABASE_FILE` | `server/data/salary.sqlite` | Where the SQLite file is kept. |
+| `GROQ_API_KEY`, `GEMINI_API_KEY`, `OPENROUTER_API_KEY`, `NVIDIA_API_KEY` | none | Turn the pay assistant on. See `.env.example` for every setting. |
+| `TRUST_PROXY` | unset | `1` when the app sits behind one web server. |
+
+## The pay assistant
+The assistant is optional. With no key set, the button is not shown and nothing else changes.
+
+**How it stays trustworthy.** The model never produces a number. It can only choose between four read-only tools (company overview, breakdown, outliers, employee search) that wrap the same tested code as the screens. Amounts come back as text with their currency, shares and ratios are computed in code, lists are capped at ten, and the model copies what it is given. Every answer lists its sources, so a person can open the same view and check it. See [decision D-020](docs/DECISIONS.md).
+
+**Setting it up.** Copy `.env.example` to `.env` and fill in at least one key. The file is ignored by git.
+
+| Provider | Free allowance, as measured | Key from |
+|---|---|---|
+| Groq | 1,000 requests a day and 8,000 tokens a minute, answers in about 1.5 seconds | console.groq.com/keys |
+| Gemini | 20 requests a day and 5 a minute on the main Flash models, and sometimes "high demand" errors | aistudio.google.com/apikey |
+| OpenRouter | 50 requests a day on free models, 1,000 after buying credits | openrouter.ai/keys |
+| NVIDIA | About 40 requests a minute, for trying things out | build.nvidia.com |
+| Ollama | A model on your own machine, no key and no limit | `OLLAMA_MODEL=...` |
+
+**Providers and limits.** In Auto mode the providers are tried in order and the next one is used within the same question when one is rate limited, down or refusing. A failing provider is left alone for the time it asked for. Each provider has a daily budget that counts every attempt, failed ones included, because the free tiers count them. Each visitor can ask 20 new questions an hour and everyone together 300 a day. A repeated question is answered from a cache that empties itself whenever any employee data changes. Every refusal says why and when to try again. See [decisions D-021 to D-023](docs/DECISIONS.md).
+
+**Behind a web server.** Visitors are told apart by address. If the app sits behind Apache or nginx, set `TRUST_PROXY=1`. Leave it unset otherwise, because anyone could then claim to be a different visitor.
 
 ## Checks
 ```bash
-npm test              # all tests, server and web (about 240, a few seconds)
+npm test              # all tests, server and web (about 415, a few seconds)
 npm run lint          # ESLint
 npm run typecheck     # TypeScript, no output files
 npm run format:check  # Prettier
@@ -108,6 +131,9 @@ Each is recorded with its alternatives in [docs/DECISIONS.md](docs/DECISIONS.md)
 | Statistics computed in code, not SQL (D-010) | Each insight reads about 10,000 small rows (6 to 9 ms). In return, the rules are pure tested functions. |
 | USD amount stored on each row (D-014) | Derived data that must be recomputed if the rates change. In return, the database can sort and sum by pay. |
 | Peer median as the reference, not a pay band (D-002) | It shows who differs from their colleagues, not whether the whole group is paid fairly against the market. |
+| The assistant sends questions and tool results to an outside service (D-023) | Fine for generated data. For real salary data I would send aggregates only, and use a provider with a data processing agreement and no training on inputs. |
+| Free model tiers (D-021) | Small daily allowances, and a model can still misstate a figure it was given. Hence the budgets, the failover and the sources shown under each answer. |
+| Assistant limits and cache are in memory (D-022) | A restart resets them, and people behind one office address share an allowance. |
 | API types repeated by hand in the web app | Two small files can drift apart. A shared package or a generated client would prevent it, with more build setup. |
 
 ## What I would add next
@@ -123,6 +149,8 @@ In the order I would do them:
 8. **A browser test of the main flow** against the running app, in addition to the component tests.
 9. **Exchange rates as dated data** with a recompute step, in place of constants in code.
 10. **Search that scales,** using SQLite full-text search, when the table is much larger.
+11. **Checks on the assistant's answers:** a test set of questions with known answers, run against each provider, and a check that every number in an answer appears in a tool result.
+12. **Limits that survive a restart,** kept in a table, and answers streamed word by word.
 
 ## How AI was used
 The assignment requires AI tools. I used Claude Code, working under the written instructions in [CLAUDE.md](CLAUDE.md): requirements and a spec before code, a failing test before the code that passes it, one slice at a time, and nothing committed that I cannot explain. The log of what was asked, what was kept, and what the AI got wrong is in [docs/AI_USAGE.md](docs/AI_USAGE.md).
@@ -137,6 +165,7 @@ server/src/
   http/           error handling and shared schemas
   db/             connection and migrations
   seed/           deterministic generator and seed command
+  assistant/      the pay assistant: tools, providers, failover, limits, cache
 web/src/
   pages/          one file per screen
   components/     dialogs and form helpers
