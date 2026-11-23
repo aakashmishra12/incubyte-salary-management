@@ -103,3 +103,30 @@ One entry per decision. Status is Accepted, Proposed (waiting for my review) or 
 - **Decision:** (c).
 - **Trade-off:** It is derived data, so it must be recomputed if the rates change. The rates are fixed by decision D-003, the write happens in one function, and in return the database can sort, filter and sum by pay with a plain column.
 
+## D-015: The API sends money as whole minor units with a currency code
+- **Status:** Accepted, 24 Nov 2026
+- **Context:** Amounts cross from the database to the server to the browser as JSON numbers.
+- **Options considered:** (a) Decimal major units such as `85000.5`. (b) Text such as `"85000.50"`. (c) Whole minor units such as `8500050` plus `"USD"`.
+- **Decision:** (c), the same convention payment APIs use.
+- **Trade-off:** A person reading the JSON must know that 8500050 means 85,000.50. In return no floating point value ever crosses the wire, and one function in the browser does all the formatting.
+
+## D-016: Rule violations answer 422, state conflicts answer 409, bad shapes answer 400
+- **Status:** Accepted, 24 Nov 2026
+- **Context:** The UI needs to tell "you typed something invalid" from "this is not allowed".
+- **Decision:** 400 with the field name when the request has the wrong shape (checked by Zod before any code runs). 422 when the shape is right and a business rule refuses it, such as a date in the future. 409 when the employee's state forbids the action, such as changing the salary of someone who has left, or a duplicate email. Anything unexpected is a 500 with no internal details.
+- **Trade-off:** Three codes to explain instead of one. The browser can show the server's message as it is, and never has to repeat the rules.
+
+## D-017: Reference data lives in code, not in tables
+- **Status:** Accepted, 24 Nov 2026
+- **Context:** Countries, currencies, exchange rates, departments and levels are needed by validation, the seed and the UI.
+- **Options considered:** (a) Tables with screens to edit them. (b) Constants in one file, served to the UI by one endpoint.
+- **Decision:** (b).
+- **Trade-off:** Adding a country needs a code change and a deploy. These lists change rarely, a change to a rate should be reviewed, and TypeScript can check every use of a country or currency code at compile time.
+
+## D-018: The employee list keeps its filters in the address bar
+- **Status:** Accepted, 24 Nov 2026
+- **Context:** Search, filters, sort and page are state that the user builds up.
+- **Options considered:** (a) Component state. (b) URL query parameters.
+- **Decision:** (b).
+- **Trade-off:** A little more code to read and write the address. In return a view can be bookmarked or shared, refresh keeps it, and the back button undoes a filter.
+
