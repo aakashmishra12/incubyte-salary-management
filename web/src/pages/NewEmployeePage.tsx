@@ -28,7 +28,12 @@ export function NewEmployeePage() {
   const [values, setValues] = useState(EMPTY_FORM);
   const [localErrors, setLocalErrors] = useState<Partial<Record<Field, string>>>({});
 
-  const set = (field: Field) => (value: string) => setValues({ ...values, [field]: value });
+  const set = (field: Field) => (value: string) => {
+    setValues({ ...values, [field]: value });
+    // Stop saying "Required" under a field as soon as the person starts filling it in.
+    // Only this field is cleared, and the full check runs again on the next submit.
+    if (localErrors[field]) setLocalErrors({ ...localErrors, [field]: undefined });
+  };
 
   // The salary is typed in the currency of the chosen country.
   const currency = reference.data?.countries.find((c) => c.code === values.country)?.currency;
