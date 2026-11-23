@@ -221,7 +221,7 @@ describe('createOpenAiCompatibleClient: when it goes wrong', () => {
     expect(error.retryAfterSeconds).toBeUndefined();
   });
 
-  it.each([400, 401, 403, 404])(
+  it.each([401, 403, 404])(
     'treats status %i as a setup problem, not a passing one',
     async (status) => {
       const { fetchFn } = aFetch(() => new Response('{"error":"no"}', { status }));
@@ -231,6 +231,14 @@ describe('createOpenAiCompatibleClient: when it goes wrong', () => {
       expect(error.kind).toBe('misconfigured');
     },
   );
+
+  it.each([400, 422])('treats status %i as this one request being refused', async (status) => {
+    const { fetchFn } = aFetch(() => new Response('{"error":"bad request"}', { status }));
+
+    const error = await failureOf(client(fetchFn).complete(request));
+
+    expect(error.kind).toBe('rejected');
+  });
 
   it.each([408, 500, 502, 503])(
     'treats status %i as the provider being unavailable',
@@ -280,5 +288,106 @@ describe('createOpenAiCompatibleClient: when it goes wrong', () => {
       expect(error.message).not.toContain(SECRET);
       expect(JSON.stringify(error)).not.toContain(SECRET);
     }
+  });
+});
+
+describe('createOpenAiCompatibleClient: Gemini thought signatures', () => {
+  const geminiReply = () =>
+    Response.json({
+      choices: [
+        {
+          message: {
+            content: null,
+            tool_calls: [
+              {
+                id: 'call_g',
+                type: 'function',
+                function: { name: 'get_overview', arguments: '{}' },
+                extra_content: { google: { thought_signature: 'SIG-123' } },
+              },
+            ],
+          },
+        },
+      ],
+    });
+
+  const history = (extra?: { providerId: 'gemini' | 'groq'; value: unknown }): ModelRequest => ({
+    ...request,
+    messages: [
+      { role: 'user', content: 'Q' },
+      {
+        role: 'assistant',
+        content: null,
+        toolCalls: [
+          { id: 'call_g', name: 'get_overview', arguments: '{}', ...(extra ? { extra } : {}) },
+        ],
+      },
+      { role: 'tool', toolCallId: 'call_g', content: '{}' },
+    ],
+  });
+
+  function aProviderNamed(id: 'gemini' | 'groq', fetchFn: typeof fetch) {
+    return createOpenAiCompatibleClient({
+      id,
+      label: id,
+      baseUrl: 'https://api.example.test/v1',
+      apiKey: SECRET,
+      model: 'm',
+      fetch: fetchFn,
+    });
+  }
+
+  const sentToolCall = (calls: { init: RequestInit }[]) =>
+    JSON.parse(String(calls[0]!.init.body)).messages[1].tool_calls[0];
+
+  it('keeps the signature Gemini attaches to a tool call', async () => {
+    const { fetchFn } = aFetch(() => geminiReply());
+
+    const reply = await aProviderNamed('gemini', fetchFn).complete(request);
+
+    expect(reply.toolCalls[0]!.extra).toEqual({
+      providerId: 'gemini',
+      value: { google: { thought_signature: 'SIG-123' } },
+    });
+  });
+
+  it('sends Gemini its own signature back, because it refuses tool results without one', async () => {
+    const { fetchFn, calls } = aFetch(() => answer('ok'));
+
+    await aProviderNamed('gemini', fetchFn).complete(
+      history({ providerId: 'gemini', value: { google: { thought_signature: 'SIG-123' } } }),
+    );
+
+    expect(sentToolCall(calls).extra_content).toEqual({ google: { thought_signature: 'SIG-123' } });
+  });
+
+  it('sends a placeholder signature for a tool call that another provider made', async () => {
+    const { fetchFn, calls } = aFetch(() => answer('ok'));
+
+    await aProviderNamed('gemini', fetchFn).complete(history({ providerId: 'groq', value: {} }));
+
+    expect(sentToolCall(calls).extra_content).toEqual({
+      google: { thought_signature: 'skip_thought_signature_validator' },
+    });
+  });
+
+  it('sends a placeholder signature for a tool call that has no provider data at all', async () => {
+    const { fetchFn, calls } = aFetch(() => answer('ok'));
+
+    await aProviderNamed('gemini', fetchFn).complete(history());
+
+    expect(sentToolCall(calls).extra_content).toEqual({
+      google: { thought_signature: 'skip_thought_signature_validator' },
+    });
+  });
+
+  it('never sends Gemini-only data to any other provider', async () => {
+    const { fetchFn, calls } = aFetch(() => answer('ok'));
+
+    await aProviderNamed('groq', fetchFn).complete(
+      history({ providerId: 'gemini', value: { google: { thought_signature: 'SIG-123' } } }),
+    );
+
+    expect(sentToolCall(calls)).not.toHaveProperty('extra_content');
   });
 });

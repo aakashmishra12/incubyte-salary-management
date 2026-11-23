@@ -42,6 +42,7 @@ const limited = (retryAfterSeconds?: number) =>
   new ProviderError('rate_limited', 'limited', retryAfterSeconds);
 const down = () => new ProviderError('unavailable', 'down');
 const badKey = () => new ProviderError('misconfigured', 'bad key');
+const refused = () => new ProviderError('rejected', 'refused');
 
 function setup(providers: { client: ModelClient; dailyLimit?: number }[], clock = aClock()) {
   const logged: unknown[] = [];
@@ -124,6 +125,21 @@ describe('createFailover in Auto mode', () => {
     expect(failover.status()[0]).toMatchObject({ id: 'groq', state: 'misconfigured' });
     expect(logged).toHaveLength(1);
     clock.advance(3601);
+    expect(failover.status()[0]!.state).toBe('ready');
+  });
+
+  it('leaves a provider alone for five minutes when it refuses a request, and logs it', async () => {
+    const groq = aProvider('groq', refused());
+    const router = aProvider('openrouter', said('ok'));
+    const { failover, clock, logged } = setup([{ client: groq.client }, { client: router.client }]);
+
+    await failover.complete(request);
+
+    expect(failover.status()[0]).toMatchObject({ id: 'groq', state: 'cooling_down' });
+    expect(logged).toHaveLength(1);
+    clock.advance(299);
+    expect(failover.status()[0]!.state).toBe('cooling_down');
+    clock.advance(2);
     expect(failover.status()[0]!.state).toBe('ready');
   });
 

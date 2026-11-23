@@ -20,14 +20,28 @@ describe('loadAssistantConfig', () => {
     });
   });
 
-  it('tries providers in the default order: Groq, OpenRouter, then a local model', () => {
+  it('tries providers in the default order: Gemini, Groq, OpenRouter, then a local model', () => {
     const config = loadAssistantConfig({
       OPENROUTER_API_KEY: 'o-key',
       GROQ_API_KEY: 'g-key',
+      GEMINI_API_KEY: 'm-key',
       OLLAMA_MODEL: 'llama3.1',
     });
 
-    expect(config.providers.map((p) => p.id)).toEqual(['groq', 'openrouter', 'ollama']);
+    expect(config.providers.map((p) => p.id)).toEqual(['gemini', 'groq', 'openrouter', 'ollama']);
+  });
+
+  it('turns on Gemini through its OpenAI-style address, with a budget under its free daily limit', () => {
+    const config = loadAssistantConfig({ GEMINI_API_KEY: 'm-key' });
+
+    expect(config.providers[0]).toMatchObject({
+      id: 'gemini',
+      label: 'Gemini',
+      baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai',
+      apiKey: 'm-key',
+      model: 'gemini-3.5-flash',
+      dailyLimit: 18,
+    });
   });
 
   it('follows the order in ASSISTANT_PROVIDERS and leaves out any provider not listed', () => {
