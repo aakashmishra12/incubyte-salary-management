@@ -36,7 +36,8 @@ export function stubApi(handlers: Record<string, Handler>) {
       const handler = handlers[`${method} ${url.pathname}`];
       if (!handler) return new Response('{"error":"Not found"}', { status: 404 });
 
-      const result = handler(url, init);
+      // A handler may return a promise, to act as a slow server or one that cannot be reached.
+      const result = await handler(url, init);
       return result instanceof Response ? result : Response.json(result);
     }),
   );
