@@ -1,6 +1,7 @@
 import type { Db } from '../db/database.ts';
 import type { Employee, EmployeeDraft, EmployeeStatus } from '../domain/employee.ts';
 import { toUsdMinor } from '../domain/money.ts';
+import type { CurrencyCode } from '../domain/reference.ts';
 
 /** What the caller may sort the list by. */
 export type EmployeeSort =
@@ -78,6 +79,27 @@ export function createEmployeeRepository(db: Db) {
 
   const countStatement = db.prepare('SELECT COUNT(*) AS total FROM employees');
 
+  const findByIdStatement = db.prepare(`SELECT ${EMPLOYEE_COLUMNS} FROM employees WHERE id = ?`);
+
+  const salaryHistoryStatement = db.prepare(`
+    SELECT
+      id,
+      previous_minor AS previousMinor,
+      new_minor      AS newMinor,
+      currency,
+      effective_date AS effectiveDate,
+      reason
+    FROM salary_changes
+    WHERE employee_id = ?
+    ORDER BY effective_date DESC, id DESC
+  `);
+
+  const updateSalaryStatement = db.prepare(`
+    UPDATE employees
+    SET salary_minor = @salaryMinor, salary_usd_minor = @salaryUsdMinor, updated_at = @now
+    WHERE id = @id
+  `);
+
   return {
     /** Stores a new employee and returns the id the database gave them. */
     insert(draft: EmployeeDraft, now: string): number {
@@ -96,6 +118,32 @@ export function createEmployeeRepository(db: Db) {
 
     count(): number {
       return (countStatement.get() as { total: number }).total;
+    },
+
+    findById(id: number): Employee | undefined {
+      return findByIdStatement.get(id) as Employee | undefined;
+    },
+
+    /** Every salary change for one employee, newest first. */
+    salaryHistory(employeeId: number): SalaryChange[] {
+      return salaryHistoryStatement.all(employeeId) as SalaryChange[];
+    },
+
+    updateSalary(id: number, salaryMinor: number, currency: CurrencyCode, now: string): void {
+      updateSalaryStatement.run({
+        id,
+        salaryMinor,
+        salaryUsdMinor: toUsdMinor(salaryMinor, currency),
+        now,
+      });
+    },
+
+    /**
+     * Runs several writes as one unit: all of them are saved, or none.
+     * If `work` throws, everything it wrote is undone.
+     */
+    inTransaction<T>(work: () => T): T {
+      return db.transaction(work)();
     },
 
     /** One page of employees matching the query, and how many match in total. */
@@ -128,6 +176,16 @@ export function createEmployeeRepository(db: Db) {
 
 /** The type of the object above, so other files can say "I need an employee repository". */
 export type EmployeeRepository = ReturnType<typeof createEmployeeRepository>;
+
+/** One row of salary history as stored. */
+export interface SalaryChange {
+  id: number;
+  previousMinor: number | null;
+  newMinor: number;
+  currency: string;
+  effectiveDate: string;
+  reason: string;
+}
 
 export interface SalaryChangeDraft {
   employeeId: number;
