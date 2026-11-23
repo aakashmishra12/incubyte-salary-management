@@ -16,6 +16,6 @@ if (seedIfEmpty(db, DEFAULT_SEED, SEED_TIMESTAMP)) {
 // The web app is built into web/dist. In development it does not exist, and Vite serves the UI.
 const webDir = existsSync(config.webDir) ? config.webDir : undefined;
 
-createApp({ webDir }).listen(config.port, () => {
+createApp({ db, webDir }).listen(config.port, () => {
   console.log(`Salary Management listening on http://localhost:${config.port}`);
 });
