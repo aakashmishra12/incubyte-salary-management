@@ -1,9 +1,18 @@
 import { existsSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { createApp } from './app.ts';
+import { buildAssistant } from './assistant/buildAssistant.ts';
+import { loadAssistantConfig } from './assistant/config.ts';
+import { createFailover } from './assistant/failover.ts';
+import { createOpenAiCompatibleClient } from './assistant/providerClient.ts';
 import { config } from './config.ts';
 import { openDatabase } from './db/database.ts';
 import { DEFAULT_SEED, SEED_TIMESTAMP, seedIfEmpty } from './seed/seedDatabase.ts';
+
+// Settings such as provider keys live in a .env file at the project root, which git ignores.
+// Variables already set in the environment win over the file.
+const envFile = path.join(import.meta.dirname, '../../.env');
+if (existsSync(envFile)) process.loadEnvFile(envFile);
 
 mkdirSync(path.dirname(config.databaseFile), { recursive: true });
 const db = openDatabase(config.databaseFile);
@@ -16,7 +25,35 @@ if (seedIfEmpty(db, DEFAULT_SEED, SEED_TIMESTAMP)) {
 // The web app is built into web/dist. In development it does not exist, and Vite serves the UI.
 const webDir = existsSync(config.webDir) ? config.webDir : undefined;
 
-const server = createApp({ db, webDir }).listen(config.port, () => {
+// The pay assistant is on only if at least one provider key is set.
+const assistantConfig = loadAssistantConfig(process.env);
+console.log(assistantConfig.describe());
+const assistant =
+  assistantConfig.providers.length > 0
+    ? buildAssistant({
+        db,
+        limits: assistantConfig.limits,
+        failover: createFailover({
+          providers: assistantConfig.providers.map(({ dailyLimit, ...provider }) => ({
+            client: createOpenAiCompatibleClient(provider),
+            dailyLimit,
+          })),
+          clock: () => new Date(),
+          logError: (error) => console.error('Assistant provider problem:', error),
+        }),
+      })
+    : undefined;
+
+// How many web servers sit in front of this one (for example 1 for Apache). Leave it unset
+// when the app is reached directly, so nobody can claim to be a different visitor.
+const trustProxy = Number(process.env.TRUST_PROXY);
+
+const server = createApp({
+  db,
+  webDir,
+  assistant,
+  trustProxy: Number.isInteger(trustProxy) && trustProxy > 0 ? trustProxy : undefined,
+}).listen(config.port, () => {
   console.log(`Salary Management listening on http://localhost:${config.port}`);
 });
 
