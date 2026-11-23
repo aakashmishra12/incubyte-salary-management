@@ -15,7 +15,9 @@ describe('normalizeQuestion', () => {
   });
 
   it('keeps different questions different', () => {
-    expect(normalizeQuestion('paid most in India')).not.toBe(normalizeQuestion('paid most in Japan'));
+    expect(normalizeQuestion('paid most in India')).not.toBe(
+      normalizeQuestion('paid most in Japan'),
+    );
   });
 });
 
