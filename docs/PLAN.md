@@ -8,7 +8,7 @@ Written on 23 Nov 2026, after the requirements one-pager and before any code.
 3. **Green.** The smallest code that makes it pass, committed as `feat:` or `fix:`.
 4. **Refactor.** Clean up with the tests green, committed as `refactor:`.
 5. **Review.** I read every line the AI wrote before it is committed. Anything I cannot explain is rewritten or removed.
-6. **Ship.** CI runs lint and tests. The main branch deploys.
+6. **Ship.** CI runs lint, type checks and tests on every push. The main branch is always deployable.
 
 ## Commit history
 The history is meant to be read from the first commit to the last as the story of the build.
@@ -21,7 +21,7 @@ The history is meant to be read from the first commit to the last as the story o
 ## Slices, in order
 | # | Slice | What exists at the end |
 |---|---|---|
-| 0 | Walking skeleton | Repository, TypeScript, lint, formatter, tests, CI, a health endpoint and one page, deployed. This proves the hosting choice on day one. |
+| 0 | Walking skeleton | Repository, TypeScript, lint, formatter, tests, CI, a health endpoint and one page that calls it. Every later slice adds to an app that already builds, tests and runs. |
 | 1 | Pay rules | Money, currency conversion, median and spread, compa-ratio and the outlier rule, as pure tested functions. |
 | 2 | Data | Schema, indexes, migration, and a deterministic seed of 10,000 employees. |
 | 3 | Browse employees | Table with pagination, sorting, search and filters, from database to screen. |
@@ -46,6 +46,6 @@ No test depends on the clock, the network or random data. Dates and the random s
 ## Risks
 | Risk | Answer |
 |---|---|
-| Free hosts wipe the disk on restart, which loses the SQLite file | The app seeds itself when the database is empty. Proven in slice 0. |
+| The database file is lost or the server is rebuilt | The app seeds itself when the database is empty, so recovery is one command. See D-012. |
 | Scope grows | The one-pager is the boundary. New ideas go to "what I would add next". |
 | AI output that looks right and is wrong | Tests first, and line-by-line review before every commit. |

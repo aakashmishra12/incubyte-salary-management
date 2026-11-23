@@ -57,7 +57,7 @@ One entry per decision. Status is Accepted, Proposed (waiting for my review) or 
 - **Trade-off:** Not safe for real data as it stands. Authentication and an audit of who made each change are the first items under "what I would add next".
 
 ## D-009: Stack
-- **Status:** Proposed
+- **Status:** Accepted, 23 Nov 2026
 - **Context:** The role is Node, React and TypeScript. The assignment asks for a relational database and a component library.
 - **Decision:** TypeScript on both sides. Express 5 with Zod for input validation. SQLite with hand-written SQL behind a repository layer. React with Vite and MUI. Vitest, Supertest and React Testing Library. GitHub Actions.
 - **Options considered and why not:**
@@ -66,18 +66,25 @@ One entry per decision. Status is Accepted, Proposed (waiting for my review) or 
   - An ORM (Prisma, Drizzle): hides the SQL. There are about ten queries, and plain SQL is easier to read and to explain.
   - Fastify: a fine choice. Express is the one more people know.
 - **Trade-off:** SQLite is a single file on one server. If ACME needed several app servers or many concurrent writers, the repository layer is the only place that would change to move to PostgreSQL.
-- **Open:** SQLite driver. `better-sqlite3` is mature and needs a native binary on the host. Node's built-in `node:sqlite` needs no install and is marked release candidate in Node 26. To be settled in Stage 1 by deploying a skeleton.
+- **Open:** SQLite driver. `better-sqlite3` is mature and needs a native binary on the host. Node's built-in `node:sqlite` needs no install and is marked release candidate in Node 26. To be settled in the data slice, when the first query is written.
 
 ## D-010: Statistics are computed in code, not in SQL
-- **Status:** Proposed
+- **Status:** Accepted, 23 Nov 2026
 - **Context:** SQLite has no median function.
 - **Options considered:** (a) Median in SQL with window functions. (b) Fetch only group and amount for active employees and compute in plain TypeScript functions.
 - **Decision:** (b).
 - **Trade-off:** 10,000 small rows are read per insight request, which is a few milliseconds and will be measured. In return the business rules are pure functions that are tested without a database. At millions of rows this would move into SQL or a summary table.
 
 ## D-011: Work in vertical slices, each with a short spec first
-- **Status:** Proposed
+- **Status:** Accepted, 23 Nov 2026
 - **Context:** The commit history must show how the solution evolved, and the app should be deployable early.
 - **Options considered:** (a) Layer by layer: all of the database, then all of the API, then all of the UI. (b) Feature by feature, each from database to screen.
 - **Decision:** (b). Each slice starts with acceptance criteria in `docs/specs/`, then a failing test, then the code, then a refactor. The app is deployed from the first slice.
 - **Trade-off:** Some early code is revisited when a later slice needs more from it. Every commit leaves a working app, and nothing is integrated late.
+
+## D-012: Hosting on a VPS
+- **Status:** Accepted, 23 Nov 2026
+- **Context:** The app must be deployed and working. SQLite is a file, so the host needs a disk that survives restarts.
+- **Options considered:** (a) A free platform host. Deploys on every push, and the free tier has no persistent disk and sleeps when idle, so the first visit is slow and edits are lost on restart. (b) A Linux VPS I have access to, running the Node process behind the web server that is already there.
+- **Decision:** (b). The app still seeds itself when the database is empty, so a fresh server needs one command.
+- **Trade-off:** Setup and updates are manual steps that a platform would do for me, and they are written down in the README. In return the data persists, there is no cold start during a review, and the deployment is something I can explain end to end.

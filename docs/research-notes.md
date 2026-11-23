@@ -23,7 +23,7 @@ Sources: [Node.js SQLite documentation](https://nodejs.org/api/sqlite.html), npm
 ## Hosting an app that uses SQLite
 - Render's free web services have no persistent disk, so a SQLite file is lost on restart or redeploy. Persistent disks are a paid feature.
 
-**What this changed:** the app seeds itself when the database is empty, and the hosting choice is tested in slice 0 instead of at the end.
+**What this changed:** I chose a VPS with a real disk over a free platform host (D-012). The app still seeds itself when the database is empty.
 
 Sources: [Render community thread on SQLite](https://community.render.com/t/is-a-sqlite-in-the-free-account-deleted-after-some-time/6960), [Render free tier article](https://render.com/articles/platforms-with-a-real-free-tier-for-developers-in-2026)
 
