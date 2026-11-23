@@ -1,4 +1,5 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { askAssistant, fetchAssistantStatus } from './assistant.ts';
 import {
   changeSalary,
   createEmployee,
@@ -44,6 +45,24 @@ export function useEmployees(params: URLSearchParams) {
 
 export function useEmployee(id: number) {
   return useQuery({ queryKey: ['employee', id], queryFn: () => fetchEmployee(id) });
+}
+
+export function useAssistantStatus() {
+  return useQuery({
+    queryKey: ['assistant', 'status'],
+    queryFn: fetchAssistantStatus,
+    staleTime: 30_000,
+  });
+}
+
+/** Asks the assistant a question. Each answer changes what is left of the allowance and the providers' state. */
+export function useAskAssistant() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: askAssistant,
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['assistant', 'status'] }),
+  });
 }
 
 // Every insight key starts with 'insights', so one call can mark them all as out of date.
