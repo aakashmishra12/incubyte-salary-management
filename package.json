@@ -20,10 +20,13 @@
     "typecheck": "npm run typecheck --workspaces",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "measure": "npm run measure -w server",
+    "coverage": "npm run coverage --workspaces"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
+    "@vitest/coverage-v8": "5.1.1",
     "concurrently": "10.0.7",
     "eslint": "10.15.0",
     "eslint-plugin-react-hooks": "7.1.1",
@@ -33,6 +36,7 @@
     "vite": "8.3.8"
   },
   "allowScripts": {
-    "better-sqlite3": false
+    "better-sqlite3": false,
+    "fsevents": false
   }
 }
