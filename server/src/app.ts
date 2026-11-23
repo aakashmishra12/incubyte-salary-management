@@ -2,8 +2,10 @@ import path from 'node:path';
 import express, { type Express } from 'express';
 import helmet from 'helmet';
 import type { Db } from './db/database.ts';
+import type { AssistantService } from './assistant/assistantService.ts';
 import { createErrorHandler } from './http/errors.ts';
 import { createEmployeeRepository } from './repositories/employeeRepository.ts';
+import { assistantRoutes } from './routes/assistant.ts';
 import { employeeRoutes } from './routes/employees.ts';
 import { insightRoutes } from './routes/insights.ts';
 import { referenceRoutes } from './routes/reference.ts';
@@ -19,6 +21,14 @@ export interface AppDependencies {
   logError?: (error: unknown) => void;
   /** Tells the app what time it is. Tests pass a fixed time. Defaults to the real clock. */
   clock?: () => Date;
+  /** The pay assistant. Left out when no provider is set up, and then the assistant is off. */
+  assistant?: AssistantService | undefined;
+  /**
+   * How many web servers sit in front of this app (for example 1 for Apache). Needed to tell
+   * visitors apart by address. Leave it unset when the app faces the internet directly,
+   * because otherwise anyone could claim any address with a header.
+   */
+  trustProxy?: number | undefined;
 }
 
 /**
@@ -30,8 +40,11 @@ export function createApp({
   webDir,
   logError = console.error,
   clock = () => new Date(),
+  assistant,
+  trustProxy,
 }: AppDependencies): Express {
   const app = express();
+  if (trustProxy !== undefined) app.set('trust proxy', trustProxy);
 
   // Standard security headers. One directive is switched off: it tells browsers to load
   // everything over HTTPS, which would break the app wherever it is served over plain HTTP.
@@ -55,6 +68,7 @@ export function createApp({
   app.use('/api/reference', referenceRoutes());
   app.use('/api/employees', employeeRoutes(employeeService));
   app.use('/api/insights', insightRoutes(insightService));
+  app.use('/api/assistant', assistantRoutes(assistant));
 
   // Anything else under /api is a mistake by the caller. Answer in JSON like the rest of the API.
   app.use('/api', (_request, response) => {

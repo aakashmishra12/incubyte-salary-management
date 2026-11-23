@@ -7,10 +7,20 @@ import { ZodError } from 'zod';
  */
 export class HttpError extends Error {
   readonly status: number;
+  /** Extra fields for the JSON body, next to `error`. */
+  readonly body: Record<string, unknown>;
+  /** Extra response headers, such as Retry-After. */
+  readonly headers: Record<string, string>;
 
-  constructor(status: number, message: string) {
+  constructor(
+    status: number,
+    message: string,
+    extra: { body?: Record<string, unknown>; headers?: Record<string, string> } = {},
+  ) {
     super(message);
     this.status = status;
+    this.body = extra.body ?? {};
+    this.headers = extra.headers ?? {};
   }
 }
 
@@ -39,7 +49,10 @@ export function createErrorHandler(logError: (error: unknown) => void): ErrorReq
     }
 
     if (error instanceof HttpError) {
-      response.status(error.status).json({ error: error.message });
+      response
+        .set(error.headers)
+        .status(error.status)
+        .json({ error: error.message, ...error.body });
       return;
     }
 
