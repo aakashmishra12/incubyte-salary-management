@@ -88,3 +88,11 @@ One entry per decision. Status is Accepted, Proposed (waiting for my review) or 
 - **Options considered:** (a) A free platform host. Deploys on every push, and the free tier has no persistent disk and sleeps when idle, so the first visit is slow and edits are lost on restart. (b) A Linux VPS I have access to, running the Node process behind the web server that is already there.
 - **Decision:** (b). The app still seeds itself when the database is empty, so a fresh server needs one command.
 - **Trade-off:** Setup and updates are manual steps that a platform would do for me, and they are written down in the README. In return the data persists, there is no cold start during a review, and the deployment is something I can explain end to end.
+
+## D-013: TypeScript 6.0, run directly by Node on the server
+- **Status:** Accepted, 23 Nov 2026
+- **Context:** TypeScript 7.0 is the newest release. Node 24 and later can run TypeScript files directly by removing the type annotations.
+- **Options considered:** (a) TypeScript 7.0. (b) TypeScript 6.0. For running the server: (c) compile to JavaScript with `tsc` and run the output, (d) let Node run the `.ts` files and use `tsc` only to check types.
+- **Decision:** (b) and (d).
+- **Trade-off:** The lint tooling (typescript-eslint) supports TypeScript up to 6.0 only, and working lint matters more than the newest compiler. Running `.ts` directly removes a build step and a second copy of the code. In exchange, a few TypeScript features that generate code (such as enums) cannot be used, and the `erasableSyntaxOnly` setting makes the compiler reject them. The server needs Node 24 or later.
+

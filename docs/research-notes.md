@@ -29,3 +29,5 @@ Sources: [Render community thread on SQLite](https://community.render.com/t/is-a
 
 ## Package versions checked (npm registry, 23 Nov 2026)
 Express 5.3, Zod 4.6, Vitest 5.1, Vite 8.3, React 19.3, MUI 9.6, TypeScript 7.0. All support Node 26. Exact versions are pinned in `package.json` when installed.
+
+Found while installing: typescript-eslint 8.74 requires TypeScript below 6.1, so the project uses TypeScript 6.0 (D-013). Vitest 5 needs Vite installed next to it.
