@@ -20,15 +20,33 @@ describe('loadAssistantConfig', () => {
     });
   });
 
-  it('tries providers in the default order: Gemini, Groq, OpenRouter, then a local model', () => {
+  it('tries providers in the default order: Groq, Gemini, OpenRouter, NVIDIA, then a local model', () => {
     const config = loadAssistantConfig({
       OPENROUTER_API_KEY: 'o-key',
       GROQ_API_KEY: 'g-key',
       GEMINI_API_KEY: 'm-key',
+      NVIDIA_API_KEY: 'n-key',
       OLLAMA_MODEL: 'llama3.1',
     });
 
-    expect(config.providers.map((p) => p.id)).toEqual(['gemini', 'groq', 'openrouter', 'ollama']);
+    expect(config.providers.map((p) => p.id)).toEqual([
+      'groq',
+      'gemini',
+      'openrouter',
+      'nvidia',
+      'ollama',
+    ]);
+  });
+
+  it('turns on NVIDIA through its OpenAI-style address', () => {
+    const config = loadAssistantConfig({ NVIDIA_API_KEY: 'n-key' });
+
+    expect(config.providers[0]).toMatchObject({
+      id: 'nvidia',
+      label: 'NVIDIA',
+      baseUrl: 'https://integrate.api.nvidia.com/v1',
+      apiKey: 'n-key',
+    });
   });
 
   it('turns on Gemini through its OpenAI-style address, with a budget under its free daily limit', () => {

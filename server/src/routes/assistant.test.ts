@@ -212,6 +212,16 @@ describe('POST /api/assistant/ask', () => {
     });
   });
 
+  it('accepts any provider this app knows by name, so a hand-chosen NVIDIA reaches the failover', async () => {
+    const failover = aFailover(said('Hi'));
+    const { app } = setup(failover);
+
+    const response = await ask(app, { question: 'A question', provider: 'nvidia' });
+
+    expect(response.status).toBe(200);
+    expect(response.body.provider).toBe('nvidia');
+  });
+
   it('refuses a provider that is not set up with a 400', async () => {
     const { app } = setup(aFailover(new UnknownProviderError('ollama')));
 
