@@ -98,6 +98,9 @@ export function createUsageLimiter({
       if (day.key === clock().toISOString().slice(0, 10) && day.count > 0) day.count -= 1;
     },
 
+    /** The limits this limiter enforces, so a caller can report them. */
+    limits: { perVisitorPerHour, perDay },
+
     trackedVisitors: () => visitors.size,
   };
 }
