@@ -31,6 +31,41 @@ const salaryChangeSchema = z.object({
   reason: z.string().trim().min(3).max(200),
 });
 
+// Text fields are trimmed first, so a name of only spaces counts as empty.
+const nameSchema = z.string().trim().min(1).max(100);
+// Emails are compared as lower case, so "A@x.com" and "a@x.com" are the same person.
+const emailSchema = z.string().trim().toLowerCase().pipe(z.email().max(200));
+
+const newEmployeeSchema = z.object({
+  firstName: nameSchema,
+  lastName: nameSchema,
+  email: emailSchema,
+  country: z.enum(COUNTRY_CODES),
+  department: z.enum(DEPARTMENTS),
+  level: z.enum(LEVELS),
+  jobTitle: nameSchema,
+  hireDate: isoDateSchema,
+  salaryMinor: amountMinorSchema,
+});
+
+/**
+ * Only these fields can be corrected. Zod drops any other field in the body,
+ * which is how a salary or a country sent here is ignored.
+ */
+const employeeChangesSchema = z
+  .object({
+    firstName: nameSchema,
+    lastName: nameSchema,
+    email: emailSchema,
+    department: z.enum(DEPARTMENTS),
+    level: z.enum(LEVELS),
+    jobTitle: nameSchema,
+  })
+  .partial()
+  .refine((changes) => Object.keys(changes).length > 0, 'Send at least one field to change');
+
+const leaveSchema = z.object({ leftOn: isoDateSchema });
+
 export function employeeRoutes(employees: EmployeeService): Router {
   const router = Router();
 
@@ -38,6 +73,23 @@ export function employeeRoutes(employees: EmployeeService): Router {
     // parse throws a ZodError on bad input, which the error handler turns into a 400.
     const query = listQuerySchema.parse(request.query);
     response.json(employees.list(query));
+  });
+
+  router.post('/', (request, response) => {
+    const input = newEmployeeSchema.parse(request.body);
+    response.status(201).json(employees.create(input));
+  });
+
+  router.patch('/:id', (request, response) => {
+    const { id } = idParamSchema.parse(request.params);
+    const changes = employeeChangesSchema.parse(request.body);
+    response.json(employees.updateDetails(id, changes));
+  });
+
+  router.post('/:id/leave', (request, response) => {
+    const { id } = idParamSchema.parse(request.params);
+    const { leftOn } = leaveSchema.parse(request.body);
+    response.json(employees.markLeft(id, leftOn));
   });
 
   router.get('/:id', (request, response) => {
