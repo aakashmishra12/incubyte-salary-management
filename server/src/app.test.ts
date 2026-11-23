@@ -49,3 +49,19 @@ describe('when given a built web app to serve', () => {
     expect(response.body).toEqual({ error: 'Not found' });
   });
 });
+
+describe('security headers', () => {
+  it('sends the standard protective headers on every response', async () => {
+    const response = await request(createApp({ db })).get('/api/health');
+
+    expect(response.headers['x-content-type-options']).toBe('nosniff');
+    expect(response.headers['x-frame-options']).toBe('SAMEORIGIN');
+    expect(response.headers['content-security-policy']).toContain("default-src 'self'");
+  });
+
+  it('does not announce which framework the server runs', async () => {
+    const response = await request(createApp({ db })).get('/api/health');
+
+    expect(response.headers['x-powered-by']).toBeUndefined();
+  });
+});
