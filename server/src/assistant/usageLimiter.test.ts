@@ -115,4 +115,34 @@ describe('createUsageLimiter', () => {
     expect(limiter.tryUse('c')).toMatchObject({ allowed: false, reason: 'busy' });
     expect(limiter.trackedVisitors()).toBe(2);
   });
+
+  describe('giving an allowance back and showing what is left', () => {
+    it('shows how many questions a visitor has left, without using one', () => {
+      const limiter = createUsageLimiter({ ...limits, clock: aClock().now });
+      limiter.tryUse('a');
+
+      expect(limiter.remaining('a')).toBe(2);
+      expect(limiter.remaining('a')).toBe(2);
+      expect(limiter.remaining('never-seen')).toBe(3);
+    });
+
+    it('gives a question back to the visitor and to the day', () => {
+      const limiter = createUsageLimiter({ perVisitorPerHour: 3, perDay: 1, clock: aClock().now });
+      limiter.tryUse('a');
+
+      limiter.refund('a');
+
+      expect(limiter.remaining('a')).toBe(3);
+      expect(limiter.tryUse('b')).toMatchObject({ allowed: true });
+    });
+
+    it('does nothing when there is nothing to give back', () => {
+      const limiter = createUsageLimiter({ ...limits, clock: aClock().now });
+
+      limiter.refund('never-seen');
+
+      expect(limiter.remaining('never-seen')).toBe(3);
+      expect(limiter.tryUse('x')).toEqual({ allowed: true, remainingThisHour: 2 });
+    });
+  });
 });

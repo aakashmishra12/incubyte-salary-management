@@ -162,3 +162,45 @@ describe('employeeRepository.list', () => {
     expect(newestFirst.items.map((e) => e.lastName)).toEqual(['B', 'A']);
   });
 });
+
+describe('employeeRepository.dataVersion', () => {
+  it('stays the same while data is only read', () => {
+    const { repository } = aDatabaseWith([anEmployee()]);
+    const before = repository.dataVersion();
+
+    repository.list(query());
+    repository.activePayRows();
+
+    expect(repository.dataVersion()).toBe(before);
+  });
+
+  it.each([
+    [
+      'an employee is added',
+      (r: ReturnType<typeof aDatabaseWith>['repository']) =>
+        r.insert(anEmployee(), '2026-11-20T09:00:00.000Z'),
+    ],
+    [
+      'a salary changes',
+      (r: ReturnType<typeof aDatabaseWith>['repository'], id: number) =>
+        r.updateSalary(id, 1_00, 'USD', '2026-11-20T09:00:00.000Z'),
+    ],
+    [
+      'details are edited',
+      (r: ReturnType<typeof aDatabaseWith>['repository'], id: number) =>
+        r.updateDetails(id, { level: 'L5' }, '2026-11-20T09:00:00.000Z'),
+    ],
+    [
+      'someone is marked as left',
+      (r: ReturnType<typeof aDatabaseWith>['repository'], id: number) =>
+        r.markLeft(id, '2026-11-01', '2026-11-20T09:00:00.000Z'),
+    ],
+  ])('changes when %s', (_what, change) => {
+    const { repository, ids } = aDatabaseWith([anEmployee()]);
+    const before = repository.dataVersion();
+
+    change(repository, ids[0]!);
+
+    expect(repository.dataVersion()).not.toBe(before);
+  });
+});
