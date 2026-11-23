@@ -21,6 +21,8 @@ One persona: the HR Manager. They know the organisation and the pay data. They a
 7. Breakdown: minimum, median, average and maximum salary by country, department or level.
 8. Outliers: employees paid more than 20% above or below the median of their peers, where peers share the same country, department and level.
 
+9. Ask questions about pay in plain words and get an answer that shows its sources. *(Added on 24 Nov 2026, after the first version of this document. See D-020 to D-023.)*
+
 Each feature gets acceptance criteria and tests before it is built.
 
 ## Rules and assumptions

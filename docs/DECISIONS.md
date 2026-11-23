@@ -137,3 +137,29 @@ One entry per decision. Status is Accepted, Proposed (waiting for my review) or 
 - **Decision:** (c). The reference is `docs/design/DESIGN.md`, an open-source description of a Vercel-inspired design language (ink on near-white, hairline borders, the Geist typeface). `web/src/theme.ts` turns its tokens into an MUI theme.
 - **Trade-off:** The look is borrowed, not designed for ACME. In return it is consistent, written down, and changing it later means changing one file. The parts of the reference meant for marketing pages (the gradient, pill buttons) are left out, for the reasons in `docs/design/README.md`. No test changed, because the tests check behaviour and not appearance.
 
+## D-020: Add a pay assistant, and make the model unable to invent numbers
+- **Status:** Accepted, 24 Nov 2026. This adds a feature after the one-pager was written (F9).
+- **Context:** The HR Manager's real question is often "who is paid furthest above their peers in India?", asked in words and not in filters. The assignment does not require an assistant, but it is titled "Build with AI", and asking in words is the natural way to answer the pay questions.
+- **Options considered:** (a) Let the model write SQL. (b) Put the whole employee table in the prompt. (c) Give the model a few fixed, read-only tools that wrap code that is already tested, and let it only choose which tool to call and phrase the result.
+- **Decision:** (c).
+- **Trade-off:** The assistant can only answer what the tools cover. In return no figure comes from the model, it cannot read or change anything else, an injected instruction has nothing dangerous to call, and every answer can be checked against a screen the app already has. A model can still misstate a figure it was given, which is why each answer lists its sources.
+
+## D-021: Providers behind one OpenAI-style interface, with failover and a daily budget
+- **Status:** Accepted, 24 Nov 2026
+- **Context:** Free model APIs change their limits and their model lists without notice. The research found sources that disagreed about what some providers still offer.
+- **Options considered:** (a) One provider's own SDK. (b) The OpenAI-style chat format with tools, which Groq, OpenRouter and Ollama all accept, behind one small interface, with the provider chosen by settings.
+- **Decision:** (b). Providers are tried in order. A limited or failing provider is skipped for a cooling-off time. Each has a daily budget of calls that counts failed attempts too, because OpenRouter's free tier counts them.
+- **Trade-off:** I wrote about 100 lines of client instead of using an SDK, and use only the features all providers share. In return a provider can be added or dropped with settings, and no provider's outage or limit ends the feature.
+
+## D-022: Limits and a cache that cannot go stale
+- **Status:** Accepted, 24 Nov 2026
+- **Context:** The live app has no login, and a free allowance is shared by every visitor. Anyone who finds the address could use it all.
+- **Decision:** 20 new questions per visitor per hour and 300 per day overall, both settings. A repeated first question is answered from a cache of at most 100 answers for at most an hour, keyed by the question and by SQLite's count of rows changed on the connection, so any data change empties the cache without any code having to remember to.
+- **Trade-off:** Limits and cache are in memory, so a restart resets them, and visitors are told apart by IP address, so people behind one office address share an allowance. A durable counter would need a table, which is more than a demo needs.
+
+## D-023: What the model is allowed to see
+- **Status:** Accepted, 24 Nov 2026
+- **Context:** Questions and tool results are sent to an outside service. Some free tiers log prompts or may train on them.
+- **Decision:** The tools return totals and breakdowns, and the outlier and search tools return at most 10 named employees per call. All data in this app is generated. Keys live in the server's environment only.
+- **Trade-off:** Fine for generated data. For real salary data I would send aggregates only, and use a provider with a data processing agreement and no training on inputs.
+
