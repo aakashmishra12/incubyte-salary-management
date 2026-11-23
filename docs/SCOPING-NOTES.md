@@ -1,5 +1,7 @@
 # Scoping notes (starting point for Stage 0)
 
+> Status: resolved on 23 Nov 2026. The outcomes are in `requirements-one-pager.md` and `DECISIONS.md`.
+
 Open decisions Aakash is working through before the one-page requirements doc. Nothing here is decided yet.
 
 1. Which questions should the HR Manager be able to answer? Candidates: average and median pay by country, department or level; who is paid far above or below peers at the same level; total salary cost; pay spread (min, max, range) per group.
