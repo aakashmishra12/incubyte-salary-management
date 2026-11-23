@@ -57,15 +57,9 @@ TypeScript end to end, because the role is Node / React / TypeScript:
 - Deploy: one simple host that fits the database choice
 
 ## Stages
-0. **Understand and scope.** Read the assignment. Discuss with Aakash what "answer questions about how the org pays people" should mean for an HR Manager (for example pay by country, department, level; ranges and medians; outliers; currency handling). Write `docs/requirements-one-pager.md`. Log assumptions. Propose stack and architecture. Stop for review.
-1. **Repo setup.** `git init` with his identity; GitHub repo `aakashmishra12/incubyte-salary-management`. First commits are the docs: assignment, one-pager, plan. Then TypeScript config, lint, formatter, test runner, CI.
-2. **Domain core, test-first.** Employee and salary model, currency and country rules, the pay-insight calculations as plain tested functions.
-3. **Database and seed.** Schema, migrations, indexes, deterministic seed script for 10,000 employees.
-4. **API.** Endpoints for managing employees and salaries (list with pagination, search, filter, create, update) and for insights. Validation and API tests.
-5. **UI.** Employee table (paginated, searchable, filterable), edit salary flow, insights dashboard. Tests for key flows.
-6. **Hardening.** Edge cases, error states, performance check with 10,000 rows, notes in `docs/PERFORMANCE.md`.
-7. **Deploy and demo.** Deploy, smoke test the live URL, outline the video demo (Aakash records it).
-8. **Docs and submission.** README complete, architecture diagram, AI usage, trade-offs. Final check against `docs/REQUIREMENTS.md`. Draft the submission reply with repo link, live URL and video link. Aakash sends it himself.
+Stage 0 (understand and scope) is done: see `docs/requirements-one-pager.md` and `docs/DECISIONS.md`.
+
+From here the work follows the slices in `docs/PLAN.md`, in order. Each slice goes: short spec with acceptance criteria in `docs/specs/`, failing test, smallest code that passes, refactor, review by Aakash, commit. Each slice starts with a plain-words plan and a "go", and ends with a summary.
 
 ## Repo visibility
 Incubyte needs a link they can open. The repo under `aakashmishra12` is private during development and is made public at submission.
