@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { COUNTRIES, DEPARTMENTS, LEVELS, type CountryCode } from '../domain/reference.ts';
+import { amountMinorSchema, idParamSchema, isoDateSchema } from '../http/schemas.ts';
 import type { EmployeeService } from '../services/employeeService.ts';
 
 const COUNTRY_CODES = Object.keys(COUNTRIES) as [CountryCode, ...CountryCode[]];
@@ -24,6 +25,12 @@ const listQuerySchema = z.object({
   order: z.enum(['asc', 'desc']).default('asc'),
 });
 
+const salaryChangeSchema = z.object({
+  newSalaryMinor: amountMinorSchema,
+  effectiveDate: isoDateSchema,
+  reason: z.string().trim().min(3).max(200),
+});
+
 export function employeeRoutes(employees: EmployeeService): Router {
   const router = Router();
 
@@ -31,6 +38,18 @@ export function employeeRoutes(employees: EmployeeService): Router {
     // parse throws a ZodError on bad input, which the error handler turns into a 400.
     const query = listQuerySchema.parse(request.query);
     response.json(employees.list(query));
+  });
+
+  router.get('/:id', (request, response) => {
+    const { id } = idParamSchema.parse(request.params);
+    response.json(employees.getDetail(id));
+  });
+
+  router.post('/:id/salary-changes', (request, response) => {
+    const { id } = idParamSchema.parse(request.params);
+    const change = salaryChangeSchema.parse(request.body);
+    // 201 Created: a new salary history row now exists.
+    response.status(201).json(employees.changeSalary(id, change));
   });
 
   return router;

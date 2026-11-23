@@ -14,17 +14,27 @@ export interface AppDependencies {
   webDir?: string;
   /** Where unexpected errors are reported. Defaults to the console. */
   logError?: (error: unknown) => void;
+  /** Tells the app what time it is. Tests pass a fixed time. Defaults to the real clock. */
+  clock?: () => Date;
 }
 
 /**
  * Builds the Express app without starting it.
  * Tests call this directly, and index.ts calls it and then listens on a port.
  */
-export function createApp({ db, webDir, logError = console.error }: AppDependencies): Express {
+export function createApp({
+  db,
+  webDir,
+  logError = console.error,
+  clock = () => new Date(),
+}: AppDependencies): Express {
   const app = express();
 
+  // Reads JSON request bodies. Bodies over 100 kB are refused, which is far more than any form here sends.
+  app.use(express.json({ limit: '100kb' }));
+
   // Wire the layers together: repository (SQL) -> service (rules) -> routes (HTTP).
-  const employeeService = createEmployeeService(createEmployeeRepository(db));
+  const employeeService = createEmployeeService(createEmployeeRepository(db), clock);
 
   app.get('/api/health', (_request, response) => {
     response.json({ status: 'ok' });

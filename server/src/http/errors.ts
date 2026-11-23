@@ -32,6 +32,12 @@ export function createErrorHandler(logError: (error: unknown) => void): ErrorReq
       return;
     }
 
+    // express.json() reports a body it cannot read with this type.
+    if (error?.type === 'entity.parse.failed') {
+      response.status(400).json({ error: 'The request body is not valid JSON' });
+      return;
+    }
+
     if (error instanceof HttpError) {
       response.status(error.status).json({ error: error.message });
       return;
