@@ -25,3 +25,22 @@ export function formatMoney(amountMinor: number, currency: string): string {
 export function formatUsd(amountMinor: number): string {
   return formatMoney(amountMinor, 'USD');
 }
+
+/**
+ * Reads an amount a person typed ("110,000" or "85000.50") into minor units.
+ * Returns null for anything that is not a plain positive amount.
+ */
+export function parseMoney(text: string, currency: string): number | null {
+  const cleaned = text.trim().replaceAll(',', '');
+  // Digits, then optionally a dot and more digits. Number() alone would accept "1e6" and " ".
+  if (!/^\d+(\.\d+)?$/.test(cleaned)) return null;
+
+  const amountMinor = Math.round(Number(cleaned) * 10 ** minorUnitsOf(currency));
+  return amountMinor > 0 ? amountMinor : null;
+}
+
+/** "+10.0%" for a rise from 100 to 110, "-5.0%" for a cut from 100 to 95. */
+export function percentChange(fromMinor: number, toMinor: number): string {
+  const percent = ((toMinor - fromMinor) / fromMinor) * 100;
+  return `${percent >= 0 ? '+' : ''}${percent.toFixed(1)}%`;
+}
