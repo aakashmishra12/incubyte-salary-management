@@ -95,6 +95,8 @@ export function createEmployeeRepository(db: Db) {
     ORDER BY effective_date DESC, id DESC
   `);
 
+  const totalChangesStatement = db.prepare('SELECT total_changes() AS n');
+
   const findIdByEmailStatement = db.prepare('SELECT id FROM employees WHERE email = ?');
 
   // Employee codes look like E00042. Take the number part of the highest one.
@@ -150,6 +152,15 @@ export function createEmployeeRepository(db: Db) {
         salaryUsdMinor: toUsdMinor(salaryMinor, currency),
         now,
       });
+    },
+
+    /**
+     * A number that changes whenever any row on this connection is added or changed.
+     * Anything that remembers an answer about the data, such as the assistant's cache,
+     * keys it by this number, so a remembered answer can never outlive the data it described.
+     */
+    dataVersion(): number {
+      return (totalChangesStatement.get() as { n: number }).n;
     },
 
     /** The id of the employee who has this email, if anyone does. */

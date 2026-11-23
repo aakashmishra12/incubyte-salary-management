@@ -84,6 +84,20 @@ export function createUsageLimiter({
       return { allowed: true, remainingThisHour: perVisitorPerHour - entry.count };
     },
 
+    /** How many questions a visitor can still ask this hour. Does not use one. */
+    remaining(visitorId: string): number {
+      const entry = visitors.get(visitorId);
+      if (!entry || entry.windowStart + HOUR_MS <= clock().getTime()) return perVisitorPerHour;
+      return Math.max(0, perVisitorPerHour - entry.count);
+    },
+
+    /** Gives back a question that could not be answered, for example because every provider was down. */
+    refund(visitorId: string): void {
+      const entry = visitors.get(visitorId);
+      if (entry && entry.count > 0) entry.count -= 1;
+      if (day.key === clock().toISOString().slice(0, 10) && day.count > 0) day.count -= 1;
+    },
+
     trackedVisitors: () => visitors.size,
   };
 }
