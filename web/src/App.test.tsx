@@ -1,45 +1,40 @@
-import { render, screen } from '@testing-library/react';
+import { screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { App } from './App.tsx';
-
-function stubFetch(implementation: () => Promise<Response>) {
-  vi.stubGlobal('fetch', vi.fn(implementation));
-}
+import { anEmployee, reference } from './testing/fixtures.ts';
+import { renderPage, stubApi } from './testing/render.tsx';
 
 afterEach(() => {
   vi.unstubAllGlobals();
 });
 
 describe('App', () => {
-  it('shows the app name', () => {
-    stubFetch(() => Promise.resolve(Response.json({ status: 'ok' })));
+  it('shows the app name and the navigation', () => {
+    stubApi({});
 
-    render(<App />);
+    renderPage(<App />);
 
-    expect(screen.getByRole('heading', { name: 'Salary Management' })).toBeInTheDocument();
+    expect(screen.getByText('Salary Management')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Employees' })).toBeInTheDocument();
   });
 
-  it('says the API is reachable when the health check succeeds', async () => {
-    stubFetch(() => Promise.resolve(Response.json({ status: 'ok' })));
+  it('opens on the employee list', async () => {
+    stubApi({
+      'GET /api/reference': () => reference,
+      'GET /api/employees': () => ({ items: [anEmployee()], total: 1, page: 1, pageSize: 25 }),
+    });
 
-    render(<App />);
+    renderPage(<App />);
 
-    expect(await screen.findByText('API is reachable')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Employees' })).toBeInTheDocument();
+    expect(await screen.findByText('Asha Rao')).toBeInTheDocument();
   });
 
-  it('says the API cannot be reached when the health check fails', async () => {
-    stubFetch(() => Promise.reject(new Error('network down')));
+  it('says so when the address does not exist', () => {
+    stubApi({});
 
-    render(<App />);
+    renderPage(<App />, { route: '/no-such-page' });
 
-    expect(await screen.findByText('Cannot reach the API')).toBeInTheDocument();
-  });
-
-  it('says the API cannot be reached when the server answers with an error', async () => {
-    stubFetch(() => Promise.resolve(new Response('boom', { status: 500 })));
-
-    render(<App />);
-
-    expect(await screen.findByText('Cannot reach the API')).toBeInTheDocument();
+    expect(screen.getByText('This page does not exist.')).toBeInTheDocument();
   });
 });
