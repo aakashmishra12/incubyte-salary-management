@@ -19,6 +19,8 @@ import { useState, type ReactNode } from 'react';
 import { Link as RouterLink, useParams } from 'react-router';
 import { useEmployee, useReference } from '../api/queries.ts';
 import { ChangeSalaryDialog } from '../components/ChangeSalaryDialog.tsx';
+import { EditDetailsDialog } from '../components/EditDetailsDialog.tsx';
+import { MarkAsLeftDialog } from '../components/MarkAsLeftDialog.tsx';
 import { formatDate } from '../format/date.ts';
 import { formatMoney, formatUsd, percentChange } from '../format/money.ts';
 
@@ -27,7 +29,8 @@ export function EmployeeDetailPage() {
   const { id } = useParams();
   const detail = useEmployee(Number(id));
   const reference = useReference();
-  const [isChangingSalary, setIsChangingSalary] = useState(false);
+  // Which dialog is open, if any. One piece of state means two can never be open at once.
+  const [openDialog, setOpenDialog] = useState<'salary' | 'details' | 'left' | null>(null);
 
   if (detail.isPending) {
     return <CircularProgress aria-label="Loading employee" />;
@@ -61,6 +64,16 @@ export function EmployeeDetailPage() {
           color={hasLeft ? 'default' : 'success'}
           variant="outlined"
         />
+        {!hasLeft && (
+          <Stack direction="row" spacing={1} sx={{ ml: 'auto !important' }}>
+            <Button variant="outlined" onClick={() => setOpenDialog('details')}>
+              Edit details
+            </Button>
+            <Button variant="outlined" color="warning" onClick={() => setOpenDialog('left')}>
+              Mark as left
+            </Button>
+          </Stack>
+        )}
       </Stack>
 
       <Stack direction={{ xs: 'column', md: 'row' }} spacing={3}>
@@ -104,7 +117,7 @@ export function EmployeeDetailPage() {
                 salary can no longer be changed.
               </Typography>
             ) : (
-              <Button variant="contained" onClick={() => setIsChangingSalary(true)}>
+              <Button variant="contained" onClick={() => setOpenDialog('salary')}>
                 Change salary
               </Button>
             )}
@@ -152,9 +165,15 @@ export function EmployeeDetailPage() {
         </TableContainer>
       </Paper>
 
-      {/* Rendered only while open, so each opening starts with an empty form. */}
-      {isChangingSalary && (
-        <ChangeSalaryDialog employee={employee} onClose={() => setIsChangingSalary(false)} />
+      {/* Rendered only while open, so each opening starts with a fresh form. */}
+      {openDialog === 'salary' && (
+        <ChangeSalaryDialog employee={employee} onClose={() => setOpenDialog(null)} />
+      )}
+      {openDialog === 'details' && (
+        <EditDetailsDialog employee={employee} onClose={() => setOpenDialog(null)} />
+      )}
+      {openDialog === 'left' && (
+        <MarkAsLeftDialog employee={employee} onClose={() => setOpenDialog(null)} />
       )}
     </Stack>
   );

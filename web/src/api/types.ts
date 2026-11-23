@@ -57,3 +57,20 @@ export interface SalaryChangeInput {
   effectiveDate: string;
   reason: string;
 }
+
+export interface NewEmployeeInput {
+  firstName: string;
+  lastName: string;
+  email: string;
+  country: string;
+  department: string;
+  level: string;
+  jobTitle: string;
+  hireDate: string;
+  salaryMinor: number;
+}
+
+/** The details that can be corrected. Only the fields that changed are sent. */
+export type EmployeeChanges = Partial<
+  Pick<Employee, 'firstName' | 'lastName' | 'email' | 'department' | 'level' | 'jobTitle'>
+>;

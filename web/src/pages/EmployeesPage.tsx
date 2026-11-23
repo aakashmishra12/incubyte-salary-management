@@ -87,14 +87,19 @@ export function EmployeesPage() {
 
   return (
     <Stack spacing={2}>
-      <Box>
-        <Typography variant="h5" component="h1">
-          Employees
-        </Typography>
-        <Typography color="text.secondary" aria-live="polite">
-          {employees.data ? countLabel(employees.data.total) : ' '}
-        </Typography>
-      </Box>
+      <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <Box>
+          <Typography variant="h5" component="h1">
+            Employees
+          </Typography>
+          <Typography color="text.secondary" aria-live="polite">
+            {employees.data ? countLabel(employees.data.total) : ' '}
+          </Typography>
+        </Box>
+        <Button variant="contained" component={RouterLink} to="/employees/new">
+          Add employee
+        </Button>
+      </Stack>
 
       <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
         <TextField

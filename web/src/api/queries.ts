@@ -1,6 +1,19 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { changeSalary, fetchEmployee, fetchEmployees, fetchReference } from './employees.ts';
-import type { SalaryChangeInput } from './types.ts';
+import {
+  changeSalary,
+  createEmployee,
+  fetchEmployee,
+  fetchEmployees,
+  fetchReference,
+  markEmployeeLeft,
+  updateEmployee,
+} from './employees.ts';
+import type {
+  EmployeeChanges,
+  EmployeeDetail,
+  NewEmployeeInput,
+  SalaryChangeInput,
+} from './types.ts';
 
 /**
  * Hooks that load server data. TanStack Query caches each result under its key,
@@ -26,18 +39,46 @@ export function useEmployee(id: number) {
   return useQuery({ queryKey: ['employee', id], queryFn: () => fetchEmployee(id) });
 }
 
-/** Saves a salary change. A mutation is TanStack Query's name for a request that changes data. */
-export function useChangeSalary(id: number) {
+/**
+ * What every successful change to an employee does to the cache.
+ * A mutation is TanStack Query's name for a request that changes data.
+ */
+function useShowUpdatedEmployee() {
   const queryClient = useQueryClient();
 
+  return (updated: EmployeeDetail) => {
+    // The server answered with the updated employee, so show it without asking again.
+    queryClient.setQueryData(['employee', updated.employee.id], updated);
+    // Lists and insights may now be out of date. Mark them so they reload when next shown.
+    queryClient.invalidateQueries({ queryKey: ['employees'] });
+    queryClient.invalidateQueries({ queryKey: ['insights'] });
+  };
+}
+
+export function useChangeSalary(id: number) {
   return useMutation({
     mutationFn: (change: SalaryChangeInput) => changeSalary(id, change),
-    onSuccess: (updated) => {
-      // The server answered with the updated employee, so show it without asking again.
-      queryClient.setQueryData(['employee', id], updated);
-      // Lists and insights may now be out of date. Mark them so they reload when next shown.
-      queryClient.invalidateQueries({ queryKey: ['employees'] });
-      queryClient.invalidateQueries({ queryKey: ['insights'] });
-    },
+    onSuccess: useShowUpdatedEmployee(),
+  });
+}
+
+export function useCreateEmployee() {
+  return useMutation({
+    mutationFn: (input: NewEmployeeInput) => createEmployee(input),
+    onSuccess: useShowUpdatedEmployee(),
+  });
+}
+
+export function useUpdateEmployee(id: number) {
+  return useMutation({
+    mutationFn: (changes: EmployeeChanges) => updateEmployee(id, changes),
+    onSuccess: useShowUpdatedEmployee(),
+  });
+}
+
+export function useMarkLeft(id: number) {
+  return useMutation({
+    mutationFn: (leftOn: string) => markEmployeeLeft(id, leftOn),
+    onSuccess: useShowUpdatedEmployee(),
   });
 }
