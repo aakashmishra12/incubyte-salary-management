@@ -94,6 +94,19 @@ export function createEmployeeRepository(db: Db) {
     ORDER BY effective_date DESC, id DESC
   `);
 
+  const findIdByEmailStatement = db.prepare('SELECT id FROM employees WHERE email = ?');
+
+  // Employee codes look like E00042. Take the number part of the highest one.
+  const highestCodeNumberStatement = db.prepare(`
+    SELECT COALESCE(MAX(CAST(SUBSTR(employee_code, 2) AS INTEGER)), 0) AS highest
+    FROM employees
+    WHERE employee_code LIKE 'E%'
+  `);
+
+  const markLeftStatement = db.prepare(`
+    UPDATE employees SET status = 'left', left_on = @leftOn, updated_at = @now WHERE id = @id
+  `);
+
   const updateSalaryStatement = db.prepare(`
     UPDATE employees
     SET salary_minor = @salaryMinor, salary_usd_minor = @salaryUsdMinor, updated_at = @now
@@ -138,6 +151,30 @@ export function createEmployeeRepository(db: Db) {
       });
     },
 
+    /** The id of the employee who has this email, if anyone does. */
+    findIdByEmail(email: string): number | undefined {
+      return (findIdByEmailStatement.get(email) as { id: number } | undefined)?.id;
+    },
+
+    /** The next free employee code: E10001 when the highest so far is E10000. */
+    nextEmployeeCode(): string {
+      const { highest } = highestCodeNumberStatement.get() as { highest: number };
+      return `E${String(highest + 1).padStart(5, '0')}`;
+    },
+
+    /** Changes only the fields given. The column names come from the fixed table below. */
+    updateDetails(id: number, changes: EmployeeDetailChanges, now: string): void {
+      const fields = Object.keys(changes) as (keyof EmployeeDetailChanges)[];
+      const assignments = fields.map((field) => `${EDITABLE_COLUMNS[field]} = @${field}`);
+      db.prepare(
+        `UPDATE employees SET ${assignments.join(', ')}, updated_at = @now WHERE id = @id`,
+      ).run({ ...changes, id, now });
+    },
+
+    markLeft(id: number, leftOn: string, now: string): void {
+      markLeftStatement.run({ id, leftOn, now });
+    },
+
     /**
      * Runs several writes as one unit: all of them are saved, or none.
      * If `work` throws, everything it wrote is undone.
@@ -176,6 +213,26 @@ export function createEmployeeRepository(db: Db) {
 
 /** The type of the object above, so other files can say "I need an employee repository". */
 export type EmployeeRepository = ReturnType<typeof createEmployeeRepository>;
+
+/** The details that can be corrected after an employee is created. All are optional. */
+export interface EmployeeDetailChanges {
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  department?: string;
+  level?: string;
+  jobTitle?: string;
+}
+
+/** Which column each editable field is stored in. Nothing outside this table can be updated. */
+const EDITABLE_COLUMNS: Record<keyof EmployeeDetailChanges, string> = {
+  firstName: 'first_name',
+  lastName: 'last_name',
+  email: 'email',
+  department: 'department',
+  level: 'level',
+  jobTitle: 'job_title',
+};
 
 /** One row of salary history as stored. */
 export interface SalaryChange {
