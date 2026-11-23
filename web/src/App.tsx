@@ -1,5 +1,6 @@
 import { AppBar, Box, Button, Container, Toolbar, Typography } from '@mui/material';
 import { Link, Route, Routes, useLocation } from 'react-router';
+import { AssistantLauncher } from './components/assistant/AssistantLauncher.tsx';
 import { EmployeeDetailPage } from './pages/EmployeeDetailPage.tsx';
 import { EmployeesPage } from './pages/EmployeesPage.tsx';
 import { InsightsPage } from './pages/InsightsPage.tsx';
@@ -31,6 +32,8 @@ export function App() {
           <Route path="*" element={<Typography>This page does not exist.</Typography>} />
         </Routes>
       </Container>
+
+      <AssistantLauncher />
     </Box>
   );
 }
