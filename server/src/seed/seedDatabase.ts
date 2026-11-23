@@ -6,6 +6,9 @@ import { generateEmployees, type GenerateOptions } from './generateEmployees.ts'
 /** The seed used by `npm run seed` and by the server when it starts empty. */
 export const DEFAULT_SEED: GenerateOptions = { count: 10_000, seed: 2026 };
 
+/** A fixed timestamp for seeded rows, so two seeded databases are identical. */
+export const SEED_TIMESTAMP = '2026-11-01T00:00:00.000Z';
+
 /** Stores the employees, each with the first row of their salary history. */
 export function seedDatabase(db: Db, employees: readonly EmployeeDraft[], now: string): void {
   const repository = createEmployeeRepository(db);

@@ -26,6 +26,14 @@ npm run dev
 
 The app opens on http://localhost:5173. The API runs on http://localhost:3000.
 
+The first start creates the database and fills it with 10,000 employees. To rebuild it at any time:
+
+```bash
+npm run seed
+```
+
+The seed is deterministic: every run produces the same 10,000 people, byte for byte.
+
 To run it the way it runs in production, as one process on one port:
 
 ```bash
