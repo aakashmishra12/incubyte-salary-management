@@ -66,7 +66,7 @@ One entry per decision. Status is Accepted, Proposed (waiting for my review) or 
   - An ORM (Prisma, Drizzle): hides the SQL. There are about ten queries, and plain SQL is easier to read and to explain.
   - Fastify: a fine choice. Express is the one more people know.
 - **Trade-off:** SQLite is a single file on one server. If ACME needed several app servers or many concurrent writers, the repository layer is the only place that would change to move to PostgreSQL.
-- **Open:** SQLite driver. `better-sqlite3` is mature and needs a native binary on the host. Node's built-in `node:sqlite` needs no install and is marked release candidate in Node 26. To be settled in the data slice, when the first query is written.
+- **SQLite driver (settled in the data slice):** `better-sqlite3`. Node's built-in `node:sqlite` needs no install, and it is still marked release candidate in Node 26. `better-sqlite3` is mature, and version 13 ships ready-made binaries for macOS, Linux and Windows inside the package, so nothing is compiled on install. Its optional build script is switched off in `package.json` (`allowScripts`). All SQL sits behind the repository layer, so changing the driver later touches one folder.
 
 ## D-010: Statistics are computed in code, not in SQL
 - **Status:** Accepted, 23 Nov 2026
@@ -95,4 +95,11 @@ One entry per decision. Status is Accepted, Proposed (waiting for my review) or 
 - **Options considered:** (a) TypeScript 7.0. (b) TypeScript 6.0. For running the server: (c) compile to JavaScript with `tsc` and run the output, (d) let Node run the `.ts` files and use `tsc` only to check types.
 - **Decision:** (b) and (d).
 - **Trade-off:** The lint tooling (typescript-eslint) supports TypeScript up to 6.0 only, and working lint matters more than the newest compiler. Running `.ts` directly removes a build step and a second copy of the code. In exchange, a few TypeScript features that generate code (such as enums) cannot be used, and the `erasableSyntaxOnly` setting makes the compiler reject them. The server needs Node 24 or later.
+
+## D-014: Store the USD equivalent next to each salary
+- **Status:** Accepted, 23 Nov 2026
+- **Context:** Sorting the employee list by pay and summing cost across countries both need one currency.
+- **Options considered:** (a) Convert in every query with a rate lookup. (b) Convert in application code after loading the rows. (c) Store `salary_usd_minor` on each employee row, written whenever the salary is written.
+- **Decision:** (c).
+- **Trade-off:** It is derived data, so it must be recomputed if the rates change. The rates are fixed by decision D-003, the write happens in one function, and in return the database can sort, filter and sum by pay with a plain column.
 
