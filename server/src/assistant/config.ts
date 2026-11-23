@@ -19,6 +19,17 @@ export interface AssistantConfig {
 
 /** What is known about each provider. A provider is only used if the environment turns it on. */
 const KNOWN_PROVIDERS = {
+  gemini: {
+    label: 'Gemini',
+    baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai',
+    keyVariable: 'GEMINI_API_KEY',
+    modelVariable: 'GEMINI_MODEL',
+    // Tested with a live key. The free tier allows 20 requests a day on the main Flash
+    // models, so the budget stays just under that. Raise it if billing is set up.
+    defaultModel: 'gemini-3.5-flash',
+    limitVariable: 'GEMINI_DAILY_LIMIT',
+    defaultDailyLimit: 18,
+  },
   groq: {
     label: 'Groq',
     baseUrl: 'https://api.groq.com/openai/v1',
@@ -51,7 +62,7 @@ const KNOWN_PROVIDERS = {
   },
 } as const;
 
-const DEFAULT_ORDER: ProviderId[] = ['groq', 'openrouter', 'ollama'];
+const DEFAULT_ORDER: ProviderId[] = ['gemini', 'groq', 'openrouter', 'ollama'];
 
 /** A positive whole number from the environment, or the fallback if it is missing or wrong. */
 function positiveInteger(text: string | undefined, fallback: number): number {

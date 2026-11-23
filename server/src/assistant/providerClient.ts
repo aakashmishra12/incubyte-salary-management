@@ -47,7 +47,7 @@ export function createOpenAiCompatibleClient({
         // Zero: the same question should give the same tool calls as far as possible.
         temperature: 0,
         max_tokens: request.maxTokens,
-        messages: request.messages.map(toProviderMessage),
+        messages: request.messages.map((message) => toProviderMessage(message, id)),
         tools: request.tools.map((tool) => ({ type: 'function', function: tool })),
       }),
     });
@@ -60,6 +60,12 @@ export function createOpenAiCompatibleClient({
     if (response.status === 408 || response.status >= 500) {
       throw new ProviderError('unavailable', `${label} answered with status ${response.status}`);
     }
+    if (response.status === 400 || response.status === 422) {
+      throw new ProviderError(
+        'rejected',
+        `${label} refused the request with status ${response.status}`,
+      );
+    }
     if (!response.ok) {
       throw new ProviderError(
         'misconfigured',
@@ -67,7 +73,7 @@ export function createOpenAiCompatibleClient({
       );
     }
 
-    return parseReply(await response.json(), label);
+    return parseReply(await response.json(), label, id);
   }
 
   return {
@@ -98,7 +104,7 @@ export function createOpenAiCompatibleClient({
 }
 
 /** Converts a message from this app's shape to the provider's. */
-function toProviderMessage(message: ChatMessage): Record<string, unknown> {
+function toProviderMessage(message: ChatMessage, providerId: ProviderId): Record<string, unknown> {
   if (message.role === 'tool') {
     return { role: 'tool', tool_call_id: message.toolCallId, content: message.content };
   }
@@ -110,10 +116,24 @@ function toProviderMessage(message: ChatMessage): Record<string, unknown> {
         id: call.id,
         type: 'function',
         function: { name: call.name, arguments: call.arguments },
+        // Only Gemini gets extra data, and only its own. Other providers may reject unknown fields.
+        ...(providerId === 'gemini' ? { extra_content: geminiExtraFor(call) } : {}),
       })),
     };
   }
   return { role: message.role, content: message.content };
+}
+
+/**
+ * Gemini 3 refuses a tool result unless the tool call carries its "thought signature".
+ * Its own signature is sent back as it was. For a tool call that another provider made, a
+ * documented placeholder tells Gemini to skip the check, which makes switching providers
+ * in the middle of a question safe.
+ */
+const GEMINI_PLACEHOLDER = { google: { thought_signature: 'skip_thought_signature_validator' } };
+
+function geminiExtraFor(call: ToolCall): unknown {
+  return call.extra?.providerId === 'gemini' ? call.extra.value : GEMINI_PLACEHOLDER;
 }
 
 /** The seconds the provider asked us to wait, when it said so in plain seconds. */
@@ -125,11 +145,12 @@ function retryAfterOf(response: Response): number | undefined {
 /** What a provider may send for one tool call. Every field is checked before use. */
 interface RawToolCall {
   id?: unknown;
+  extra_content?: unknown;
   function?: { name?: unknown; arguments?: unknown };
 }
 
 /** Reads the first choice of a reply. Anything unexpected counts as the provider being unavailable. */
-function parseReply(body: unknown, label: string): ModelReply {
+function parseReply(body: unknown, label: string, providerId: ProviderId): ModelReply {
   const message = (body as { choices?: { message?: Record<string, unknown> }[] })?.choices?.[0]
     ?.message;
 
@@ -148,6 +169,9 @@ function parseReply(body: unknown, label: string): ModelReply {
         id: typeof raw.id === 'string' ? raw.id : `call_${index}`,
         name,
         arguments: typeof args === 'string' ? args : JSON.stringify(args ?? {}),
+        ...(raw.extra_content !== undefined
+          ? { extra: { providerId, value: raw.extra_content } }
+          : {}),
       },
     ];
   });

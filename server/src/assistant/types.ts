@@ -1,11 +1,17 @@
 /** The providers this app knows how to talk to. */
-export type ProviderId = 'groq' | 'openrouter' | 'ollama';
+export type ProviderId = 'gemini' | 'groq' | 'openrouter' | 'ollama';
 
 /** One tool call the model asked for. `arguments` is the raw JSON text the model wrote. */
 export interface ToolCall {
   id: string;
   name: string;
   arguments: string;
+  /**
+   * Extra data a provider attached to this call, kept so it can be sent back to the same
+   * provider. Gemini 3 attaches a "thought signature" and refuses the tool result without it.
+   * It is opaque here, and other providers never receive it.
+   */
+  extra?: { providerId: ProviderId; value: unknown };
 }
 
 /**
@@ -47,10 +53,12 @@ export interface ModelClient {
  * - rate_limited: wait and try again, or use another provider.
  * - unavailable: down, slow or answering nonsense. Try again soon, or use another.
  * - misconfigured: the key or the model name is wrong. Retrying will not help.
+ * - rejected: the provider refused this one request (status 400 or 422). The provider may be
+ *   fine, so it is left alone for a few minutes and the problem is logged.
  * The message is fixed text. It never contains the key or anything the provider sent.
  */
 export class ProviderError extends Error {
-  readonly kind: 'rate_limited' | 'unavailable' | 'misconfigured';
+  readonly kind: 'rate_limited' | 'unavailable' | 'misconfigured' | 'rejected';
   readonly retryAfterSeconds: number | undefined;
 
   constructor(kind: ProviderError['kind'], message: string, retryAfterSeconds?: number) {

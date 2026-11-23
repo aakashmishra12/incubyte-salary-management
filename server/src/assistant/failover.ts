@@ -10,6 +10,7 @@ import {
 const RATE_LIMIT_DEFAULT_SECONDS = 60;
 const UNAVAILABLE_SECONDS = 30;
 const MISCONFIGURED_SECONDS = 3600;
+const REJECTED_SECONDS = 300;
 /** A provider may ask for a long wait. The status would show it as down all day, so cap it. */
 const MAX_WAIT_SECONDS = 3600;
 
@@ -130,12 +131,19 @@ export function createFailover({ providers, clock, logError }: FailoverOptions) 
         seconds = Math.min(asked ?? RATE_LIMIT_DEFAULT_SECONDS, MAX_WAIT_SECONDS);
       }
       if (failure === 'misconfigured') seconds = MISCONFIGURED_SECONDS;
+      if (failure === 'rejected') seconds = REJECTED_SECONDS;
 
       item.blockedUntil = clock().getTime() + seconds * 1000;
       item.blockedState = failure === 'misconfigured' ? 'misconfigured' : 'cooling_down';
 
-      // A wrong key or model, or a bug, needs a person. A rate limit or an outage does not.
-      if (failure === 'misconfigured' || !(error instanceof ProviderError)) logError(error);
+      // A wrong key or model, a refused request, or a bug, needs a person. A rate limit or an outage does not.
+      if (
+        failure === 'misconfigured' ||
+        failure === 'rejected' ||
+        !(error instanceof ProviderError)
+      ) {
+        logError(error);
+      }
       return { failure };
     }
   }
