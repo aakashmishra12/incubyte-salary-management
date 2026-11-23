@@ -21,6 +21,18 @@ Seeding 10,000 employees with their first history row takes about 0.11 seconds.
 
 Through HTTP on the same machine, every endpoint answered in under 25 ms on the first request and under 12 ms after that.
 
+## The pay assistant
+Measured on the development laptop with live providers, 24 Nov 2026. These depend on the provider and the time of day, so they are examples and not guarantees.
+
+| Question | Provider | Time |
+|---|---|---|
+| Who is paid furthest above their peers? | Groq (gpt-oss-120b) | 1.6 s |
+| What does a level 3 engineer earn in each country? | Groq (gpt-oss-120b) | 1.5 s |
+| How much do we spend on salaries in each country? | Gemini (3.5 Flash, low reasoning) | 7.1 s |
+| The same question again | cache | under 5 ms |
+
+A question takes two model calls: one to ask for a tool, and one to write the answer. The tools themselves take under 10 ms, the same as the screens.
+
 ## What keeps it fast
 | Choice | Effect |
 |---|---|

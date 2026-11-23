@@ -150,6 +150,12 @@ One entry per decision. Status is Accepted, Proposed (waiting for my review) or 
 - **Options considered:** (a) One provider's own SDK. (b) The OpenAI-style chat format with tools, which Groq, OpenRouter and Ollama all accept, behind one small interface, with the provider chosen by settings.
 - **Decision:** (b). Providers are tried in order. A limited or failing provider is skipped for a cooling-off time. Each has a daily budget of calls that counts failed attempts too, because OpenRouter's free tier counts them.
 - **Trade-off:** I wrote about 100 lines of client instead of using an SDK, and use only the features all providers share. In return a provider can be added or dropped with settings, and no provider's outage or limit ends the feature.
+- **What live testing taught me:**
+  - Gemini's free Flash models allow only 20 requests a day and 5 a minute, and answered with "503 high demand" in several of my tests. Groq answered in under half a second with a 1,000 a day allowance. Groq is therefore first in the default order. The daily budgets are set from these facts and not from guesses.
+  - Gemini 3 attaches a "thought signature" to each tool call and refuses the tool result with a 400 if it is not sent back. The client keeps the signature and sends it back to the same provider only. For a tool call that another provider made, a documented placeholder is sent, so switching providers in the middle of a question is safe.
+  - A 400 means one request was refused, not that the provider is broken. It cools the provider for five minutes and is logged. Only a wrong key or model name (401, 403, 404) blocks it for an hour.
+  - Gemini 3 thinks before it answers, and the thinking counts towards the token limit. A real question once stopped after its first line while looking finished. A reply that stopped at the limit is now detected, marked as cut off, and never cached.
+  - Groq's free tier also allows only 8,000 tokens a minute, so tool results are kept compact and a burst of questions is handled by the rate limit path.
 
 ## D-022: Limits and a cache that cannot go stale
 - **Status:** Accepted, 24 Nov 2026

@@ -69,6 +69,38 @@ sequenceDiagram
     B->>B: show the new salary, mark lists and insights as out of date
 ```
 
+## The pay assistant
+The assistant lets the HR Manager ask about pay in plain words. The important design rule is that **the model never produces a number**. It can only choose between four read-only tools that wrap code that is already tested, and it copies what they return.
+
+```mermaid
+flowchart LR
+    Q[Question from the panel] --> Cache{Same question,<br/>same data?}
+    Cache -- yes --> Free[Cached answer<br/>no model, no allowance used]
+    Cache -- no --> Limit{Visitor and daily<br/>limits}
+    Limit -- over --> R429[429 with the wait]
+    Limit -- ok --> Loop
+
+    subgraph Loop["Tool loop: at most 4 rounds"]
+        direction TB
+        Fail[Failover over providers<br/>Groq, Gemini, OpenRouter, NVIDIA, Ollama]
+        Tools[Four read-only tools]
+        Fail -- "asks for a tool" --> Tools
+        Tools -- "result as text with currency" --> Fail
+    end
+
+    Loop --> A[Answer + sources + who answered]
+    Tools --> Services[Insight and employee services<br/>the same tested code as the screens]
+```
+
+| Part | Where | What it does |
+|---|---|---|
+| Tools | `server/src/assistant/tools.ts` | Overview, breakdown, outliers and employee search. Amounts become text with their currency, shares and ratios are computed here, lists are capped at ten, and a mistake by the model comes back as an error it can correct. Nothing can change data. |
+| Provider client | `providerClient.ts` | One client for any provider with the OpenAI-style chat API and tools. Failures are sorted into rate limited, unavailable, refused and misconfigured. Error messages are fixed text, so a key can never leak. |
+| Failover | `failover.ts` | Tries providers in order within one question. Leaves a failing provider alone for the time it asked for, and keeps a daily budget per provider that counts failed attempts too. A provider chosen by hand is never silently replaced. |
+| Limits | `usageLimiter.ts` | 20 new questions per visitor per hour and 300 per day overall. Both are settings. A refused question costs nothing, and a question no provider could answer is given back. |
+| Cache | `answerCache.ts` | A repeated first question is answered for free. The key includes a number that changes whenever any employee data changes, so a remembered answer can never be out of date. |
+| Service | `assistantService.ts` | The order of checks (cache, limits, providers), the tool loop and its limits, and the instructions given to the model. |
+
 ## The web app
 | Part | Folder | Job |
 |---|---|---|
