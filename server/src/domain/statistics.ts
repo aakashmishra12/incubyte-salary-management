@@ -37,5 +37,11 @@ export function summarize(values: readonly number[]): Summary | null {
     total += value;
   }
 
-  return { count: values.length, min, median: middle, mean: Math.round(total / values.length), max };
+  return {
+    count: values.length,
+    min,
+    median: middle,
+    mean: Math.round(total / values.length),
+    max,
+  };
 }
