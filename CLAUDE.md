@@ -40,7 +40,7 @@ He must understand and be able to explain every line. Optimise for his understan
 1. **Stage by stage.** At the start of a stage, explain the plan in plain words and wait for "go". At the end, summarise what changed and why, list anything he should read closely, then stop.
 2. **Small commits.** One logical change per commit. Use test-first where it fits: a `test:` commit with the failing test, then a `feat:` or `fix:` commit that makes it pass, then `refactor:` if needed. Conventional commit messages.
 3. **Explain, don't dump.** No code he cannot explain. Point out the non-obvious lines.
-4. **Log AI use** in `docs/AI_USAGE.md` as you go: what was asked, what was kept, what was changed by hand, and why.
+4. **Log AI use** in `docs/AI_USAGE.md` as you go: what was asked, what was decided or kept, and how it was checked.
 5. **Log decisions** in `docs/DECISIONS.md`: context, options, choice, trade-off.
 6. **Keep it simple.** No over-engineering. But production quality: input validation, error handling, sensible structure, tests for business rules and edge cases.
 7. **Git identity:** `Aakash Mishra <theaakashdevsops@gmail.com>` (see the check below). No other account or email.
