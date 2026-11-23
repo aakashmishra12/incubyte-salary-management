@@ -12,3 +12,4 @@ coverage/
 CLAUDE.local.md
 .claude/
 server/data/
+private/

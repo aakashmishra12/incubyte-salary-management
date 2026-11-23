@@ -5,7 +5,7 @@ Tool: Claude Code (Anthropic) in VS Code. The standing instructions I gave it ar
 ## Ground rules I set
 - Work stage by stage. The AI explains the plan in plain words and waits for my go-ahead.
 - Requirements and a spec come before code. Tests come before the code that passes them.
-- I read every line before it is committed. Code I cannot explain does not go in.
+- The AI wrote the code slice by slice, test first, and I approved each stage and each decision. Before submission the finished code is reviewed file by file, and anything that cannot be explained is rewritten or removed.
 - Never invent requirements. Unclear points are written down as explicit assumptions in `docs/ASSUMPTIONS.md`.
 
 ## Log
@@ -13,7 +13,7 @@ Tool: Claude Code (Anthropic) in VS Code. The standing instructions I gave it ar
 |---|---|---|---|
 | 0. Scope | To read the assignment and report what it understood, then propose options for each open decision with a recommendation. | The split into "manage data" and "answer questions". I considered modelling bonus and allowances and chose base salary only, to keep the model simple. I chose to state assumptions in writing instead of waiting on answers. | Each proposal was discussed before anything was written. |
 | 0. Scope | To research before deciding: how HR teams measure pay, which SQLite driver works on Node 26, and how free hosts treat a SQLite file. | The compa-ratio rule for outliers. Findings and sources are in `docs/research-notes.md`. | The sources are linked, and package facts were confirmed against the npm registry. |
-| 0. Scope | To draft the one-page requirements document, the decision log, the delivery plan and the list of assumptions. | The drafts, with my decisions above. I overrode one recommendation: the AI proposed a free platform host, and I chose a VPS with a persistent disk (D-012). | I read the documents and answered each open decision before the first commit. |
+| 0. Scope | To draft the one-page requirements document, the decision log, the delivery plan and the list of assumptions. | The drafts, with my decisions above. I overrode one recommendation: the AI proposed a free platform host, and I chose a VPS with a persistent disk (D-012). | I answered each open decision in conversation, from the AI's written summaries, before the first commit. The documents were reviewed afterwards. |
 | Slice 0. Skeleton | To build the walking skeleton from the spec in `docs/specs/00-walking-skeleton.md`, one failing test at a time. | The split between `createApp` (testable) and `index.ts` (starts the server), and the JSON 404 for unknown API paths. | Tests, a run of the built app, and the first green CI run. |
 | Slices 1 and 2. Pay rules and data | To write the pay rules and the seed from the specs, each as failing tests first. | Whole-number comparison for the 80% and 120% boundaries, the seeded random generator written in the project, and the stored USD amount (D-014). | 59 tests, and two seed runs compared byte for byte. |
 | Slices 3 to 5. Employees | To build the list, detail, salary change, add, edit and mark-as-left flows, API first and then the screen. | The fixed table that maps a sort choice to a column so request text never reaches SQL, and the pure `checkSalaryChange` function. | API tests against an in-memory database, UI tests, and a salary change made by hand in the browser. |
