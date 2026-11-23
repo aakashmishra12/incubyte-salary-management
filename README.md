@@ -19,6 +19,7 @@ Built as a take-home assessment for Incubyte.
 | [Architecture](docs/ARCHITECTURE.md) | Diagrams of the system, the layers, a salary change and the data model. |
 | [Delivery plan](docs/PLAN.md) | The slices in order, the commit conventions and the test strategy. |
 | [Specs](docs/specs/) | Acceptance criteria for each slice, written before its tests. |
+| [Design language](docs/design/README.md) | The design reference, how it is applied in one theme file, and what was left out. |
 | [Performance](docs/PERFORMANCE.md) | Measured times with 10,000 employees, and what would change at larger scale. |
 | [How AI was used](docs/AI_USAGE.md) | What I asked, what I kept, what went wrong and how it was caught. |
 | [AI instructions](CLAUDE.md) | The standing instructions the AI tool worked under. |

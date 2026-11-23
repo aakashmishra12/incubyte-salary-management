@@ -19,12 +19,14 @@ Tool: Claude Code (Anthropic) in VS Code. The standing instructions I gave it ar
 | Slices 3 to 5. Employees | To build the list, detail, salary change, add, edit and mark-as-left flows, API first and then the screen. | The fixed table that maps a sort choice to a column so request text never reaches SQL, and the pure `checkSalaryChange` function. | API tests against an in-memory database, UI tests, and a salary change made by hand in the browser. |
 | Slice 6. Insights | To build the three insights from the spec. | Reporting how many employees could not be rated, and showing local currency only when a group shares one. | Tests, and the page opened in the browser against the 10,000 seeded employees. |
 | Slice 7. Hardening | To add security headers, a clean shutdown, a measurement script and the architecture and performance documents. | The measured numbers in `docs/PERFORMANCE.md`. | `npm run measure`, run on the development laptop. |
+| Design | To apply one written design language across the app. I chose the Vercel-inspired reference in `docs/design/DESIGN.md`. | One theme file that every screen reads, and leaving out the gradient and pill buttons because the reference reserves them for marketing pages. | All 64 UI tests passed unchanged, and each screen was checked in the browser. |
 
 ## What the AI got wrong, and how it was caught
 | What happened | How it was caught | What changed |
 |---|---|---|
 | A "failing" test failed because a package was missing, not because the feature was missing. | Reading the failure message instead of only the red status. | Each red run is now checked for the expected message before the test is committed. |
 | A date check reported the same field twice for one mistake. | An API test that expects exactly one issue per wrong field. | The two checks became one. |
+| A theme setting that older MUI versions accepted does not exist in MUI 9. | The type check failed. | The supported `variants` form is used instead. |
 | A UI test looked for a date that appears twice on the page. | The test failed on its first run against the real page. | The test now looks inside the details panel only. |
 
 ## How I checked the AI's work

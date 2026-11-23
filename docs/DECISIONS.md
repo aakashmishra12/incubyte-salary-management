@@ -130,3 +130,10 @@ One entry per decision. Status is Accepted, Proposed (waiting for my review) or 
 - **Decision:** (b).
 - **Trade-off:** A little more code to read and write the address. In return a view can be bookmarked or shared, refresh keeps it, and the back button undoes a filter.
 
+## D-019: One design language, applied through the MUI theme
+- **Status:** Accepted, 24 Nov 2026
+- **Context:** The app was built on MUI's default look. It worked, and it looked like every MUI demo.
+- **Options considered:** (a) Keep the default. (b) Style each screen by hand. (c) Adopt one written design language and apply it in one theme file.
+- **Decision:** (c). The reference is `docs/design/DESIGN.md`, an open-source description of a Vercel-inspired design language (ink on near-white, hairline borders, the Geist typeface). `web/src/theme.ts` turns its tokens into an MUI theme.
+- **Trade-off:** The look is borrowed, not designed for ACME. In return it is consistent, written down, and changing it later means changing one file. The parts of the reference meant for marketing pages (the gradient, pill buttons) are left out, for the reasons in `docs/design/README.md`. No test changed, because the tests check behaviour and not appearance.
+
