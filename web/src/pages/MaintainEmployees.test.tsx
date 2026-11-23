@@ -120,6 +120,18 @@ describe('adding an employee', () => {
     expect(await screen.findByText('Another employee already has this email.')).toBeInTheDocument();
   });
 
+  it('stops saying a field is required as soon as I start filling it in', async () => {
+    stubApi({ 'GET /api/reference': () => reference });
+    renderPage(<App />, { route: '/employees/new' });
+    await userEvent.click(await screen.findByRole('button', { name: 'Add employee' }));
+    const requiredBefore = screen.getAllByText('Required').length;
+
+    await userEvent.type(screen.getByLabelText('First name'), 'M');
+
+    // Only the field I touched is cleared. The others still need filling in.
+    expect(screen.getAllByText('Required')).toHaveLength(requiredBefore - 1);
+  });
+
   it('points out an empty required field without calling the server', async () => {
     const requests = stubApi({ 'GET /api/reference': () => reference });
     renderPage(<App />, { route: '/employees/new' });
