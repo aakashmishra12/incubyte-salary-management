@@ -36,3 +36,24 @@ export interface Reference {
   levels: string[];
   ratesAsOf: string;
 }
+
+export interface SalaryChange {
+  id: number;
+  /** Null for the starting salary. */
+  previousMinor: number | null;
+  newMinor: number;
+  currency: string;
+  effectiveDate: string;
+  reason: string;
+}
+
+export interface EmployeeDetail {
+  employee: Employee;
+  salaryHistory: SalaryChange[];
+}
+
+export interface SalaryChangeInput {
+  newSalaryMinor: number;
+  effectiveDate: string;
+  reason: string;
+}
