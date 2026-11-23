@@ -1,5 +1,6 @@
 import path from 'node:path';
 import express, { type Express } from 'express';
+import helmet from 'helmet';
 import type { Db } from './db/database.ts';
 import { createErrorHandler } from './http/errors.ts';
 import { createEmployeeRepository } from './repositories/employeeRepository.ts';
@@ -31,6 +32,14 @@ export function createApp({
   clock = () => new Date(),
 }: AppDependencies): Express {
   const app = express();
+
+  // Standard security headers. One directive is switched off: it tells browsers to load
+  // everything over HTTPS, which would break the app wherever it is served over plain HTTP.
+  app.use(
+    helmet({
+      contentSecurityPolicy: { directives: { upgradeInsecureRequests: null } },
+    }),
+  );
 
   // Reads JSON request bodies. Bodies over 100 kB are refused, which is far more than any form here sends.
   app.use(express.json({ limit: '100kb' }));
