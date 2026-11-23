@@ -1,0 +1,49 @@
+import { describe, expect, it } from 'vitest';
+import { toMinorUnits, toUsdMinor } from './money.ts';
+import { COUNTRIES, CURRENCIES } from './reference.ts';
+
+describe('toUsdMinor', () => {
+  it('leaves a USD amount unchanged', () => {
+    expect(toUsdMinor(12_345_67, 'USD')).toBe(12_345_67);
+  });
+
+  it('converts with the fixed rate for the currency', () => {
+    // 100,000.00 GBP at 1.31 USD per pound is 131,000.00 USD.
+    expect(toUsdMinor(100_000_00, 'GBP')).toBe(131_000_00);
+  });
+
+  it('converts a currency that has no smaller unit', () => {
+    // 10,000,000 yen at 0.0067 USD per yen is 67,000.00 USD.
+    expect(toUsdMinor(10_000_000, 'JPY')).toBe(67_000_00);
+  });
+
+  it('rounds to a whole cent', () => {
+    // 0.01 INR is far less than a cent.
+    expect(toUsdMinor(1, 'INR')).toBe(0);
+    // 1.00 EUR at 1.16 is exactly 116 cents.
+    expect(toUsdMinor(1_00, 'EUR')).toBe(116);
+  });
+});
+
+describe('toMinorUnits', () => {
+  it('turns dollars into cents', () => {
+    expect(toMinorUnits(85_000, 'USD')).toBe(85_000_00);
+  });
+
+  it('keeps yen as they are, because the yen has no smaller unit', () => {
+    expect(toMinorUnits(9_000_000, 'JPY')).toBe(9_000_000);
+  });
+
+  it('does not suffer from floating point drift', () => {
+    // 1.15 * 100 is 114.99999999999999 in JavaScript.
+    expect(toMinorUnits(1.15, 'USD')).toBe(115);
+  });
+});
+
+describe('reference data', () => {
+  it('gives every country a currency that has a rate', () => {
+    for (const country of Object.values(COUNTRIES)) {
+      expect(CURRENCIES[country.currency]).toBeDefined();
+    }
+  });
+});
