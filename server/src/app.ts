@@ -4,8 +4,10 @@ import type { Db } from './db/database.ts';
 import { createErrorHandler } from './http/errors.ts';
 import { createEmployeeRepository } from './repositories/employeeRepository.ts';
 import { employeeRoutes } from './routes/employees.ts';
+import { insightRoutes } from './routes/insights.ts';
 import { referenceRoutes } from './routes/reference.ts';
 import { createEmployeeService } from './services/employeeService.ts';
+import { createInsightService } from './services/insightService.ts';
 
 /** Everything the app needs from outside. Tests pass an in-memory database. */
 export interface AppDependencies {
@@ -34,13 +36,16 @@ export function createApp({
   app.use(express.json({ limit: '100kb' }));
 
   // Wire the layers together: repository (SQL) -> service (rules) -> routes (HTTP).
-  const employeeService = createEmployeeService(createEmployeeRepository(db), clock);
+  const employeeRepository = createEmployeeRepository(db);
+  const employeeService = createEmployeeService(employeeRepository, clock);
+  const insightService = createInsightService(employeeRepository);
 
   app.get('/api/health', (_request, response) => {
     response.json({ status: 'ok' });
   });
   app.use('/api/reference', referenceRoutes());
   app.use('/api/employees', employeeRoutes(employeeService));
+  app.use('/api/insights', insightRoutes(insightService));
 
   // Anything else under /api is a mistake by the caller. Answer in JSON like the rest of the API.
   app.use('/api', (_request, response) => {

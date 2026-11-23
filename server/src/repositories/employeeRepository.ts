@@ -1,5 +1,6 @@
 import type { Db } from '../db/database.ts';
 import type { Employee, EmployeeDraft, EmployeeStatus } from '../domain/employee.ts';
+import type { PayRow } from '../domain/insights.ts';
 import { toUsdMinor } from '../domain/money.ts';
 import type { CurrencyCode } from '../domain/reference.ts';
 
@@ -176,6 +177,40 @@ export function createEmployeeRepository(db: Db) {
     },
 
     /**
+     * One small row per active employee, for the insights. People who have left are never included.
+     * The optional filters narrow to a country, department or level.
+     */
+    activePayRows(filter: PayRowFilter = {}): NamedPayRow[] {
+      const conditions = ["status = 'active'"];
+      const params: Record<string, string> = {};
+      for (const field of ['country', 'department', 'level'] as const) {
+        const value = filter[field];
+        if (value) {
+          conditions.push(`${field} = @${field}`);
+          params[field] = value;
+        }
+      }
+
+      return db
+        .prepare(
+          `SELECT
+             id,
+             employee_code    AS employeeCode,
+             first_name       AS firstName,
+             last_name        AS lastName,
+             country,
+             department,
+             level,
+             currency,
+             salary_minor     AS salaryMinor,
+             salary_usd_minor AS salaryUsdMinor
+           FROM employees
+           WHERE ${conditions.join(' AND ')}`,
+        )
+        .all(params) as NamedPayRow[];
+    },
+
+    /**
      * Runs several writes as one unit: all of them are saved, or none.
      * If `work` throws, everything it wrote is undone.
      */
@@ -213,6 +248,19 @@ export function createEmployeeRepository(db: Db) {
 
 /** The type of the object above, so other files can say "I need an employee repository". */
 export type EmployeeRepository = ReturnType<typeof createEmployeeRepository>;
+
+export interface PayRowFilter {
+  country?: string;
+  department?: string;
+  level?: string;
+}
+
+/** A pay row plus the name and code, so an outlier can be shown as a person. */
+export interface NamedPayRow extends PayRow {
+  employeeCode: string;
+  firstName: string;
+  lastName: string;
+}
 
 /** The details that can be corrected after an employee is created. All are optional. */
 export interface EmployeeDetailChanges {
