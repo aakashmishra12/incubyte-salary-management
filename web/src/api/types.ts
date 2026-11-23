@@ -74,3 +74,61 @@ export interface NewEmployeeInput {
 export type EmployeeChanges = Partial<
   Pick<Employee, 'firstName' | 'lastName' | 'email' | 'department' | 'level' | 'jobTitle'>
 >;
+
+/** Count, minimum, median, mean and maximum of a group of salaries, in minor units. */
+export interface Summary {
+  count: number;
+  min: number;
+  median: number;
+  mean: number;
+  max: number;
+}
+
+export interface PayOverview {
+  headcount: number;
+  totalUsdMinor: number;
+  countries: {
+    country: string;
+    currency: string;
+    headcount: number;
+    totalLocalMinor: number;
+    totalUsdMinor: number;
+  }[];
+  ratesAsOf: string;
+}
+
+export interface PayBreakdown {
+  groupBy: 'country' | 'department' | 'level';
+  groups: {
+    key: string;
+    usd: Summary;
+    /** Null when the group mixes currencies. */
+    local: (Summary & { currency: string }) | null;
+  }[];
+  ratesAsOf: string;
+}
+
+export interface OutlierItem {
+  id: number;
+  employeeCode: string;
+  firstName: string;
+  lastName: string;
+  country: string;
+  department: string;
+  level: string;
+  currency: string;
+  salaryMinor: number;
+  direction: 'below' | 'above';
+  compaRatio: number;
+  peerMedianMinor: number;
+  peerCount: number;
+}
+
+export interface OutlierPage {
+  items: OutlierItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+  rule: { minPeers: number; lowPercent: number; highPercent: number };
+  coverage: { rated: number; unrated: number };
+}
