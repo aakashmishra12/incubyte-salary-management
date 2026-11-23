@@ -4,6 +4,7 @@ import {
   Button,
   Chip,
   LinearProgress,
+  Link,
   MenuItem,
   Paper,
   Stack,
@@ -19,7 +20,7 @@ import {
   Typography,
 } from '@mui/material';
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router';
+import { Link as RouterLink, useSearchParams } from 'react-router';
 import { useEmployees, useReference } from '../api/queries.ts';
 import { formatMoney, formatUsd } from '../format/money.ts';
 
@@ -179,7 +180,9 @@ export function EmployeesPage() {
                 <TableRow key={employee.id} hover>
                   <TableCell>{employee.employeeCode}</TableCell>
                   <TableCell>
-                    {employee.firstName} {employee.lastName}
+                    <Link component={RouterLink} to={`/employees/${employee.id}`} underline="hover">
+                      {employee.firstName} {employee.lastName}
+                    </Link>
                   </TableCell>
                   <TableCell>{employee.jobTitle}</TableCell>
                   <TableCell>{employee.department}</TableCell>

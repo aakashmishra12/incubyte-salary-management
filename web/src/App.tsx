@@ -1,5 +1,6 @@
 import { AppBar, Box, Button, Container, Toolbar, Typography } from '@mui/material';
 import { Link, Route, Routes } from 'react-router';
+import { EmployeeDetailPage } from './pages/EmployeeDetailPage.tsx';
 import { EmployeesPage } from './pages/EmployeesPage.tsx';
 
 /** The frame around every page: the top bar, and the page that matches the address. */
@@ -20,6 +21,7 @@ export function App() {
       <Container maxWidth="xl" component="main" sx={{ py: 3 }}>
         <Routes>
           <Route path="/" element={<EmployeesPage />} />
+          <Route path="/employees/:id" element={<EmployeeDetailPage />} />
           <Route path="*" element={<Typography>This page does not exist.</Typography>} />
         </Routes>
       </Container>
