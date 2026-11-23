@@ -61,8 +61,8 @@ export function EmployeeDetailPage() {
         <Chip
           size="small"
           label={hasLeft ? 'Left' : 'Active'}
-          color={hasLeft ? 'default' : 'success'}
           variant="outlined"
+          sx={{ color: hasLeft ? 'text.disabled' : 'text.primary' }}
         />
         {!hasLeft && (
           <Stack direction="row" spacing={1} sx={{ ml: 'auto !important' }}>

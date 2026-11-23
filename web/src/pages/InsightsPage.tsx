@@ -93,7 +93,7 @@ function OverviewSection({ reference }: { reference: Reference | undefined }) {
                       <TableCell>
                         <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
                           {/* A bar whose length is the share, so the eye can compare rows. */}
-                          <Box sx={{ flex: 1, bgcolor: 'grey.200', borderRadius: 1, height: 8 }}>
+                          <Box sx={{ flex: 1, bgcolor: 'divider', borderRadius: 1, height: 8 }}>
                             <Box
                               sx={{
                                 width: `${share}%`,

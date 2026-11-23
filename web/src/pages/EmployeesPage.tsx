@@ -197,8 +197,10 @@ export function EmployeesPage() {
                     <Chip
                       size="small"
                       label={employee.status === 'active' ? 'Active' : 'Left'}
-                      color={employee.status === 'active' ? 'success' : 'default'}
                       variant="outlined"
+                      sx={{
+                        color: employee.status === 'active' ? 'text.primary' : 'text.disabled',
+                      }}
                     />
                   </TableCell>
                   <TableCell align="right">
