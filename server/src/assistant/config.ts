@@ -40,7 +40,8 @@ const KNOWN_PROVIDERS = {
     baseUrl: 'https://api.groq.com/openai/v1',
     keyVariable: 'GROQ_API_KEY',
     modelVariable: 'GROQ_MODEL',
-    // Model names change. Check the provider's list when setting up a key.
+    // Checked against Groq's model list with a live key: answers in well under a second
+    // and supports tools. Model names change, so check the list when setting up a key.
     defaultModel: 'openai/gpt-oss-120b',
     limitVariable: 'GROQ_DAILY_LIMIT',
     defaultDailyLimit: 500,
@@ -58,6 +59,19 @@ const KNOWN_PROVIDERS = {
     defaultDailyLimit: 45,
     extraBody: undefined,
   },
+  nvidia: {
+    label: 'NVIDIA',
+    baseUrl: 'https://integrate.api.nvidia.com/v1',
+    keyVariable: 'NVIDIA_API_KEY',
+    modelVariable: 'NVIDIA_MODEL',
+    // Not checked with a live key yet. Check build.nvidia.com for a model that supports tools.
+    defaultModel: 'nvidia/nemotron-3-super-120b',
+    limitVariable: 'NVIDIA_DAILY_LIMIT',
+    // NVIDIA's free access is limited per minute (about 40) rather than per day. This budget is
+    // a safety margin of ours, since its free terms are for trying things out.
+    defaultDailyLimit: 200,
+    extraBody: undefined,
+  },
   ollama: {
     label: 'Ollama (local)',
     baseUrl: 'http://localhost:11434/v1',
@@ -70,7 +84,8 @@ const KNOWN_PROVIDERS = {
   },
 } as const;
 
-const DEFAULT_ORDER: ProviderId[] = ['gemini', 'groq', 'openrouter', 'ollama'];
+// Groq first: live tests showed it answering in under half a second with a large daily allowance.
+const DEFAULT_ORDER: ProviderId[] = ['groq', 'gemini', 'openrouter', 'nvidia', 'ollama'];
 
 /** A positive whole number from the environment, or the fallback if it is missing or wrong. */
 function positiveInteger(text: string | undefined, fallback: number): number {

@@ -1,5 +1,5 @@
 /** The providers this app knows how to talk to. */
-export type ProviderId = 'gemini' | 'groq' | 'openrouter' | 'ollama';
+export type ProviderId = 'gemini' | 'groq' | 'openrouter' | 'nvidia' | 'ollama';
 
 /** One tool call the model asked for. `arguments` is the raw JSON text the model wrote. */
 export interface ToolCall {

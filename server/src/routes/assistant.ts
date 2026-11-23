@@ -23,7 +23,7 @@ const askSchema = z.object({
     )
     .max(10)
     .default([]),
-  provider: z.enum(['gemini', 'groq', 'openrouter', 'ollama']).optional(),
+  provider: z.enum(['gemini', 'groq', 'openrouter', 'nvidia', 'ollama']).optional(),
 });
 
 /**
