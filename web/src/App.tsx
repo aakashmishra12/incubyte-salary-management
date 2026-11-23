@@ -1,31 +1,28 @@
-import { Alert, Container, Typography } from '@mui/material';
-import { useEffect, useState } from 'react';
-import { isApiReachable } from './api.ts';
+import { AppBar, Box, Button, Container, Toolbar, Typography } from '@mui/material';
+import { Link, Route, Routes } from 'react-router';
+import { EmployeesPage } from './pages/EmployeesPage.tsx';
 
-type ApiStatus = 'checking' | 'reachable' | 'unreachable';
-
+/** The frame around every page: the top bar, and the page that matches the address. */
 export function App() {
-  const [apiStatus, setApiStatus] = useState<ApiStatus>('checking');
-
-  useEffect(() => {
-    // If the component is removed before the answer arrives, ignore the answer.
-    let ignore = false;
-    isApiReachable().then((reachable) => {
-      if (!ignore) setApiStatus(reachable ? 'reachable' : 'unreachable');
-    });
-    return () => {
-      ignore = true;
-    };
-  }, []);
-
   return (
-    <Container maxWidth="md" sx={{ py: 4 }}>
-      <Typography variant="h4" component="h1" gutterBottom>
-        Salary Management
-      </Typography>
-      {apiStatus === 'checking' && <Alert severity="info">Checking the API</Alert>}
-      {apiStatus === 'reachable' && <Alert severity="success">API is reachable</Alert>}
-      {apiStatus === 'unreachable' && <Alert severity="error">Cannot reach the API</Alert>}
-    </Container>
+    <Box sx={{ minHeight: '100vh', bgcolor: 'grey.50' }}>
+      <AppBar position="static" elevation={0}>
+        <Toolbar>
+          <Typography variant="h6" component="div" sx={{ mr: 4 }}>
+            Salary Management
+          </Typography>
+          <Button color="inherit" component={Link} to="/">
+            Employees
+          </Button>
+        </Toolbar>
+      </AppBar>
+
+      <Container maxWidth="xl" component="main" sx={{ py: 3 }}>
+        <Routes>
+          <Route path="/" element={<EmployeesPage />} />
+          <Route path="*" element={<Typography>This page does not exist.</Typography>} />
+        </Routes>
+      </Container>
+    </Box>
   );
 }
