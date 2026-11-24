@@ -65,15 +65,18 @@ export function createOpenAiCompatibleClient({
     if (response.status === 408 || response.status >= 500) {
       throw new ProviderError('unavailable', `${label} answered with status ${response.status}`);
     }
-    if (response.status === 400 || response.status === 422) {
+    // Only these three mean the key or the model name is wrong, which nothing but a person can fix.
+    if (response.status === 401 || response.status === 403 || response.status === 404) {
       throw new ProviderError(
-        'rejected',
+        'misconfigured',
         `${label} refused the request with status ${response.status}`,
       );
     }
+    // Any other refusal (400, 402, 409, 413, 422, 451...) is about this one request. The provider
+    // may be fine, so it is left alone for a few minutes and not for an hour.
     if (!response.ok) {
       throw new ProviderError(
-        'misconfigured',
+        'rejected',
         `${label} refused the request with status ${response.status}`,
       );
     }

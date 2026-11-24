@@ -133,8 +133,13 @@ export function createFailover({ providers, clock, logError }: FailoverOptions) 
       if (failure === 'misconfigured') seconds = MISCONFIGURED_SECONDS;
       if (failure === 'rejected') seconds = REJECTED_SECONDS;
 
-      item.blockedUntil = clock().getTime() + seconds * 1000;
-      item.blockedState = failure === 'misconfigured' ? 'misconfigured' : 'cooling_down';
+      // Questions run at the same time, so a slow failure can arrive after a longer block was set.
+      // The longer block always wins.
+      const until = clock().getTime() + seconds * 1000;
+      if (until > item.blockedUntil) {
+        item.blockedUntil = until;
+        item.blockedState = failure === 'misconfigured' ? 'misconfigured' : 'cooling_down';
+      }
 
       // A wrong key or model, a refused request, or a bug, needs a person. A rate limit or an outage does not.
       if (
