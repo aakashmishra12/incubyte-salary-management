@@ -132,6 +132,26 @@ describe('adding an employee', () => {
     expect(screen.getAllByText('Required')).toHaveLength(requiredBefore - 1);
   });
 
+  it('marks every required field as required, so a screen reader says so before anything goes wrong', async () => {
+    stubApi({ 'GET /api/reference': () => reference });
+    renderPage(<App />, { route: '/employees/new' });
+
+    for (const label of ['First name', 'Last name', 'Email', 'Job title', 'Hire date']) {
+      expect(await screen.findByLabelText(new RegExp(`^${label}`))).toBeRequired();
+    }
+  });
+
+  it('moves keyboard focus to the first field that needs attention after a failed send', async () => {
+    stubApi({ 'GET /api/reference': () => reference });
+    renderPage(<App />, { route: '/employees/new' });
+    await userEvent.type(await screen.findByLabelText(/^First name/), 'Mei');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Add employee' }));
+
+    // First name is filled in, so the first problem is the last name.
+    expect(screen.getByLabelText(/^Last name/)).toHaveFocus();
+  });
+
   it('points out an empty required field without calling the server', async () => {
     const requests = stubApi({ 'GET /api/reference': () => reference });
     renderPage(<App />, { route: '/employees/new' });

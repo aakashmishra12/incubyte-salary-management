@@ -243,6 +243,58 @@ describe('InsightsPage', () => {
     });
   });
 
+  it('shows how big each country share is, in words for a screen reader and in the numbers', async () => {
+    openInsights({
+      'GET /api/insights/overview': () => ({
+        ...overview,
+        totalUsdMinor: 333_500_000_00,
+        countries: [
+          { ...overview.countries[0]!, totalUsdMinor: 300_000_000_00 },
+          { ...overview.countries[1]!, totalUsdMinor: 33_500_000_00 },
+        ],
+      }),
+    });
+    const section = within(await screen.findByRole('region', { name: 'Overview' }));
+
+    expect(
+      await section.findByRole('img', { name: 'United States: 90.0% of the cost' }),
+    ).toBeInTheDocument();
+    expect(section.getByRole('img', { name: 'Japan: 10.0% of the cost' })).toBeInTheDocument();
+    expect(section.getByText('90.0%')).toBeInTheDocument();
+  });
+
+  it('shows that a section is loading, instead of leaving it empty or stale', async () => {
+    openInsights({
+      'GET /api/insights/overview': () => new Promise<Response>(() => {}) as unknown as Response,
+    });
+    const section = within(await screen.findByRole('region', { name: 'Overview' }));
+
+    expect(
+      await section.findByRole('progressbar', { name: 'Loading the overview' }),
+    ).toBeInTheDocument();
+  });
+
+  it('shows that the breakdown is refreshing while the old figures are still on screen', async () => {
+    let release: (value: Response) => void = () => {};
+    openInsights({
+      'GET /api/insights/breakdown': (url) =>
+        url.searchParams.get('department') === 'Engineering'
+          ? (new Promise<Response>((resolve) => (release = resolve)) as unknown as Response)
+          : byCountry,
+    });
+    const section = within(await screen.findByRole('region', { name: 'Breakdown' }));
+    await section.findByText('Japan');
+
+    await userEvent.click(section.getByLabelText('Department'));
+    await userEvent.click(await screen.findByRole('option', { name: 'Engineering' }));
+
+    expect(
+      await section.findByRole('progressbar', { name: 'Loading the breakdown' }),
+    ).toBeInTheDocument();
+    expect(section.getByText('Japan')).toBeInTheDocument();
+    release(Response.json(byCountry));
+  });
+
   it('says so when an insight cannot be loaded', async () => {
     openInsights({ 'GET /api/insights/overview': () => new Response('{}', { status: 500 }) });
 
