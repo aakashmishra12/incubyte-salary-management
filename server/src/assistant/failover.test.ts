@@ -174,6 +174,39 @@ describe('createFailover in Auto mode', () => {
   });
 });
 
+describe('createFailover with questions at the same time', () => {
+  it('keeps the longer wait when a slow failure arrives after a longer block was set', async () => {
+    let failSlowly: () => void = () => {};
+    let calls = 0;
+    const provider: ModelClient = {
+      id: 'groq',
+      label: 'GROQ',
+      complete() {
+        calls += 1;
+        // The first call hangs until the test lets it fail. The second fails at once with a wrong key.
+        if (calls === 1) {
+          return new Promise<ModelReply>((_resolve, reject) => {
+            failSlowly = () => reject(down());
+          });
+        }
+        return Promise.reject(badKey());
+      },
+    };
+    const { failover, clock } = setup([{ client: provider }]);
+
+    const slow = failover.complete(request).catch(() => {});
+    await failover.complete(request).catch(() => {});
+    expect(failover.status()[0]!.state).toBe('misconfigured');
+
+    failSlowly();
+    await slow;
+
+    // The wrong key still wins: one hour, not the 30 seconds a plain outage would give.
+    clock.advance(31);
+    expect(failover.status()[0]!.state).toBe('misconfigured');
+  });
+});
+
 describe('createFailover daily budgets', () => {
   it('counts every attempt, failed ones included, and then skips the provider for the day', async () => {
     const groq = aProvider('groq', down(), said('ok'), said('ok'));

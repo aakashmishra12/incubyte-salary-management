@@ -280,6 +280,17 @@ describe('createOpenAiCompatibleClient: when it goes wrong', () => {
     },
   );
 
+  it.each([402, 405, 409, 413, 415, 451])(
+    'treats status %i as this one request being refused, not as a broken provider',
+    async (status) => {
+      const { fetchFn } = aFetch(() => new Response('{"error":"no"}', { status }));
+
+      const error = await failureOf(client(fetchFn).complete(request));
+
+      expect(error.kind).toBe('rejected');
+    },
+  );
+
   it.each([400, 422])('treats status %i as this one request being refused', async (status) => {
     const { fetchFn } = aFetch(() => new Response('{"error":"bad request"}', { status }));
 
