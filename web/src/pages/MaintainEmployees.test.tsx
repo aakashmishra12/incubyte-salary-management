@@ -181,6 +181,8 @@ describe('marking an employee as left', () => {
     await userEvent.click(within(dialog).getByRole('button', { name: 'Mark as left' }));
 
     expect(await screen.findByText(/Left on 15 Nov 2026/)).toBeInTheDocument();
+    // The buttons that were pressed have gone, so focus goes to the page heading and is not lost.
+    expect(screen.getByRole('heading', { name: 'Kenji Sato' })).toHaveFocus();
     expect(requests.find((request) => request.url.pathname.endsWith('/leave'))?.body).toEqual({
       leftOn: '2026-11-15',
     });

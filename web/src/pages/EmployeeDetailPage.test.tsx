@@ -1,4 +1,4 @@
-import { fireEvent, screen, within } from '@testing-library/react';
+import { act, fireEvent, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { EmployeeDetail } from '../api/types.ts';
@@ -47,9 +47,12 @@ function openEmployee(handlers: Parameters<typeof stubApi>[0] = {}) {
     'GET /api/employees/7': () => kenji(),
     ...handlers,
   });
-  renderPage(<App />, { route: '/employees/7' });
+  ({ queryClient } = renderPage(<App />, { route: '/employees/7' }));
   return requests;
 }
+
+/** The cache of the page just opened, so a test can make it fetch again. */
+let queryClient: ReturnType<typeof renderPage>['queryClient'];
 
 async function fillInChange({
   salary,
@@ -123,14 +126,59 @@ describe('EmployeeDetailPage', () => {
     expect(await screen.findByText('Employee not found')).toBeInTheDocument();
   });
 
-  it('does not offer a salary change for someone who has left', async () => {
+  it('offers nothing to change for someone who has left, and says they have left', async () => {
     openEmployee({
       'GET /api/employees/7': () => kenji({ status: 'left', leftOn: '2025-06-30' }),
     });
 
     await screen.findByRole('heading', { name: 'Kenji Sato' });
-    expect(screen.queryByRole('button', { name: 'Change salary' })).not.toBeInTheDocument();
+    for (const name of ['Change salary', 'Edit details', 'Mark as left']) {
+      expect(screen.queryByRole('button', { name })).not.toBeInTheDocument();
+    }
     expect(screen.getByText(/Left on 30 Jun 2025/)).toBeInTheDocument();
+    expect(screen.getByText('Left')).toBeInTheDocument();
+  });
+
+  it('shows no percentage for the starting salary, and no dollar line for a salary already in dollars', async () => {
+    openEmployee();
+
+    const history = await screen.findByRole('table', { name: 'Salary history' });
+    const starting = within(history).getAllByRole('row')[2]!;
+
+    expect(within(starting).getAllByRole('cell')[1]).toHaveTextContent('');
+    expect(within(starting).getAllByRole('cell')[3]).toHaveTextContent('');
+    expect(screen.queryByText(/at fixed rates/)).not.toBeInTheDocument();
+  });
+
+  it('keeps showing the employee when a later refresh fails, and says the data may be out of date', async () => {
+    let failing = false;
+    const requests = openEmployee({
+      'GET /api/employees/7': () => (failing ? new Response('{}', { status: 500 }) : kenji()),
+    });
+    await screen.findByRole('heading', { name: 'Kenji Sato' });
+    expect(requests.length).toBeGreaterThan(0);
+
+    failing = true;
+    await act(() => queryClient.invalidateQueries({ queryKey: ['employee', 7] }));
+
+    expect(screen.getByRole('heading', { name: 'Kenji Sato' })).toBeInTheDocument();
+    expect(
+      screen.getByText('The latest data could not be loaded. What is shown may be out of date.'),
+    ).toBeInTheDocument();
+  });
+
+  it('does not close a dialog I am typing in when a refresh fails', async () => {
+    let failing = false;
+    openEmployee({
+      'GET /api/employees/7': () => (failing ? new Response('{}', { status: 500 }) : kenji()),
+    });
+    await userEvent.click(await screen.findByRole('button', { name: 'Change salary' }));
+    await userEvent.type(await screen.findByLabelText(/New salary/), '110000');
+
+    failing = true;
+    await act(() => queryClient.invalidateQueries({ queryKey: ['employee', 7] }));
+
+    expect(screen.getByLabelText(/New salary/)).toHaveValue('110000');
   });
 });
 
