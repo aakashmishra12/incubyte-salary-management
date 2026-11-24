@@ -15,7 +15,7 @@ import {
   TableRow,
   Typography,
 } from '@mui/material';
-import { useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useBackToList } from './backToList.ts';
 import { Link as RouterLink, useParams } from 'react-router';
 import { useEmployee, useReference } from '../api/queries.ts';
@@ -33,14 +33,26 @@ export function EmployeeDetailPage() {
   // Which dialog is open, if any. One piece of state means two can never be open at once.
   const [openDialog, setOpenDialog] = useState<'salary' | 'details' | 'left' | null>(null);
 
+  // After "Mark as left" the buttons that were pressed disappear. Keyboard focus would fall to the
+  // page body, so it moves to the heading instead. (These hooks come before any early return.)
+  const heading = useRef<HTMLHeadingElement>(null);
+  const hadLeft = useRef(detail.data?.employee.status === 'left');
+  const hasLeftNow = detail.data?.employee.status === 'left';
+  useEffect(() => {
+    if (hasLeftNow && !hadLeft.current) heading.current?.focus();
+    hadLeft.current = hasLeftNow;
+  }, [hasLeftNow]);
+
   if (detail.isPending) {
     return <CircularProgress aria-label="Loading employee" />;
   }
-  if (detail.isError) {
+  // An error replaces the page only when there is nothing to show. A failed refresh, for example
+  // when the window is focused again, must not throw away what is on screen or close a dialog.
+  if (!detail.data) {
     return (
       <Stack spacing={2} sx={{ alignItems: 'flex-start' }}>
         <BackLink />
-        <Alert severity="error">{detail.error.message}</Alert>
+        <Alert severity="error">{detail.error?.message ?? 'Something went wrong'}</Alert>
       </Stack>
     );
   }
@@ -55,8 +67,14 @@ export function EmployeeDetailPage() {
     <Stack spacing={3}>
       <BackLink />
 
+      {detail.isError && (
+        <Alert severity="warning">
+          The latest data could not be loaded. What is shown may be out of date.
+        </Alert>
+      )}
+
       <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
-        <Typography variant="h5" component="h1">
+        <Typography variant="h5" component="h1" ref={heading} tabIndex={-1}>
           {employee.firstName} {employee.lastName}
         </Typography>
         <Chip

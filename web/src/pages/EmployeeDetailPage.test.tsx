@@ -161,10 +161,13 @@ describe('EmployeeDetailPage', () => {
     failing = true;
     await act(() => queryClient.invalidateQueries({ queryKey: ['employee', 7] }));
 
-    expect(screen.getByRole('heading', { name: 'Kenji Sato' })).toBeInTheDocument();
+    // The failed fetch is reported a moment after the cache is told to refresh.
     expect(
-      screen.getByText('The latest data could not be loaded. What is shown may be out of date.'),
+      await screen.findByText(
+        'The latest data could not be loaded. What is shown may be out of date.',
+      ),
     ).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Kenji Sato' })).toBeInTheDocument();
   });
 
   it('does not close a dialog I am typing in when a refresh fails', async () => {
@@ -177,6 +180,9 @@ describe('EmployeeDetailPage', () => {
 
     failing = true;
     await act(() => queryClient.invalidateQueries({ queryKey: ['employee', 7] }));
+    await screen.findByText(
+      'The latest data could not be loaded. What is shown may be out of date.',
+    );
 
     expect(screen.getByLabelText(/New salary/)).toHaveValue('110000');
   });
