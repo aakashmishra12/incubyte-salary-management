@@ -26,17 +26,28 @@ export function formatUsd(amountMinor: number): string {
   return formatMoney(amountMinor, 'USD');
 }
 
+/** The largest amount the server accepts, in minor units. Asking before saving saves a round trip. */
+const MAX_AMOUNT_MINOR = 1_000_000_000_000;
+
 /**
  * Reads an amount a person typed ("110,000" or "85000.50") into minor units.
- * Returns null for anything that is not a plain positive amount.
+ * Returns null for anything that is not a plain positive amount, and for anything that could be
+ * misread. A comma is accepted only as a thousands separator, in groups of three: "1,5" might be
+ * one and a half typed with a decimal comma, and reading it as 15 would be a hundredfold error.
+ * No more decimals are accepted than the currency has (none for yen, two for dollars).
  */
 export function parseMoney(text: string, currency: string): number | null {
-  const cleaned = text.trim().replaceAll(',', '');
-  // Digits, then optionally a dot and more digits. Number() alone would accept "1e6" and " ".
-  if (!/^\d+(\.\d+)?$/.test(cleaned)) return null;
+  const match = text.trim().match(/^(\d+|\d{1,3}(?:,\d{3})+)(?:\.(\d+))?$/);
+  if (!match) return null;
 
-  const amountMinor = Math.round(Number(cleaned) * 10 ** minorUnitsOf(currency));
-  return amountMinor > 0 ? amountMinor : null;
+  const units = minorUnitsOf(currency);
+  const fraction = match[2] ?? '';
+  if (fraction.length > units) return null;
+
+  const whole = match[1]!.replaceAll(',', '');
+  const amountMinor = Number(whole) * 10 ** units + Number(fraction.padEnd(units, '0') || 0);
+
+  return amountMinor > 0 && amountMinor <= MAX_AMOUNT_MINOR ? amountMinor : null;
 }
 
 /** "+10.0%" for a rise from 100 to 110, "-5.0%" for a cut from 100 to 95. */

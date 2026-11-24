@@ -55,7 +55,7 @@ export function NewEmployeePage() {
     }
     const salaryMinor = currency ? parseMoney(values.salary, currency) : null;
     if (!errors.salary && salaryMinor === null) {
-      errors.salary = 'Enter a positive amount, for example 85000';
+      errors.salary = 'Enter an amount such as 85000 or 85,000.50. Commas only group thousands.';
     }
     setLocalErrors(errors);
     if (Object.keys(errors).length > 0 || salaryMinor === null) return;

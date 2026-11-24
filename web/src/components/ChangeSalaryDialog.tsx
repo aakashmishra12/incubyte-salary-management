@@ -113,7 +113,8 @@ export function ChangeSalaryDialog({ employee, onClose }: Props) {
 
 function salaryHelp(text: string, parsed: number | null, isSameAsCurrent: boolean): string {
   if (text === '') return 'Annual gross base salary';
-  if (parsed === null) return 'Enter a positive amount, for example 85000';
+  if (parsed === null)
+    return 'Enter an amount such as 85000 or 85,000.50. Commas only group thousands.';
   if (isSameAsCurrent) return 'This is the current salary';
   return 'Annual gross base salary';
 }
