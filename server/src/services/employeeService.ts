@@ -111,7 +111,7 @@ export function createEmployeeService(repository: EmployeeRepository, clock: () 
     },
 
     markLeft(id: number, leftOn: string): EmployeeDetail {
-      const { employee } = getDetail(id);
+      const { employee, salaryHistory } = getDetail(id);
       const now = clock().toISOString();
 
       if (employee.status === 'left') {
@@ -125,6 +125,14 @@ export function createEmployeeService(repository: EmployeeRepository, clock: () 
       }
       if (leftOn > now.slice(0, 10)) {
         throw new HttpError(422, 'The leaving date cannot be in the future.');
+      }
+      // The history is newest first. Someone cannot leave before their pay was last set.
+      const lastChange = salaryHistory[0]?.effectiveDate;
+      if (lastChange && leftOn < lastChange) {
+        throw new HttpError(
+          422,
+          `The leaving date cannot be before the most recent salary change (${lastChange}).`,
+        );
       }
 
       repository.markLeft(id, leftOn, now);

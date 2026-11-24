@@ -39,7 +39,7 @@ describe('toUsdMinor at exact halves', () => {
 
   it('still converts a very large salary without losing a cent', () => {
     // 90 billion yen is far above any salary, and above the size where plain numbers stay exact.
-    expect(toUsdMinor(90_000_000_000, 'JPY')).toBe(60_300_000_000_00);
+    expect(toUsdMinor(90_000_000_000, 'JPY')).toBe(60_300_000_000);
   });
 
   it('gives zero for zero', () => {

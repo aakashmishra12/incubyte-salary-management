@@ -58,7 +58,7 @@ export function findOutliers(
       outliers.push({
         id: record.id,
         direction: isBelow ? 'below' : 'above',
-        compaRatio: Math.round((record.salaryMinor / peerMedianMinor) * 100) / 100,
+        compaRatio: displayedRatio(record.salaryMinor / peerMedianMinor, isBelow, rule),
         peerMedianMinor,
         peerCount: group.length,
       });
@@ -66,6 +66,21 @@ export function findOutliers(
   }
 
   return outliers;
+}
+
+/**
+ * The ratio to show, to two decimals. Someone flagged is outside the zone, so the number shown
+ * must be outside it too. A ratio of 0.7996 rounds to 0.80, which reads as "exactly on the
+ * boundary", so it is moved to the nearest value on the flagged side (0.79 here, 1.21 above).
+ */
+function displayedRatio(ratio: number, isBelow: boolean, rule: OutlierRule): number {
+  const rounded = Math.round(ratio * 100) / 100;
+  const low = rule.lowPercent / 100;
+  const high = rule.highPercent / 100;
+
+  if (isBelow && rounded >= low) return Math.round((low - 0.01) * 100) / 100;
+  if (!isBelow && rounded <= high) return Math.round((high + 0.01) * 100) / 100;
+  return rounded;
 }
 
 /**
