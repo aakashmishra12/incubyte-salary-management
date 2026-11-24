@@ -16,7 +16,7 @@ Sources: [ADP on compa-ratio](https://www.adp.com/resources/articles-and-insight
 - Node's built-in `node:sqlite` module is marked "release candidate" in the Node 26 documentation. It runs on my machine (Node 26.11.1, SQLite 3.54.1).
 - `better-sqlite3` 13.2.0 supports Node 22 and later. It is mature and widely used, and needs a native binary on the host.
 
-**What this changed:** the driver stays an open point in D-009 and is settled by deploying the skeleton, with all SQL behind a repository layer so the driver can be swapped.
+**What this changed:** the driver stayed an open point in D-009 until the first query was written, and was then settled in favour of `better-sqlite3`. All SQL sits behind a repository layer, so the driver can be swapped.
 
 Sources: [Node.js SQLite documentation](https://nodejs.org/api/sqlite.html), npm registry (`npm view better-sqlite3`)
 

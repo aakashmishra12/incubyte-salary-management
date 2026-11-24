@@ -23,10 +23,12 @@ flowchart LR
     end
 
     DB[("SQLite file<br/>employees, salary_changes")]
+    AI["Model providers<br/>Groq, Gemini, OpenRouter, NVIDIA<br/>(optional, only for the assistant)"]
 
     HR -- "page load" --> Static
     HR -- "JSON over HTTP" --> Routes
     Repos --> DB
+    Services -. "assistant questions" .-> AI
 ```
 
 ## The layers on the server
@@ -80,7 +82,7 @@ flowchart LR
     Limit -- over --> R429[429 with the wait]
     Limit -- ok --> Loop
 
-    subgraph Loop["Tool loop: at most 4 rounds"]
+    subgraph Loop["Tool loop: at most 4 model calls"]
         direction TB
         Fail[Failover over providers<br/>Groq, Gemini, OpenRouter, NVIDIA, Ollama]
         Tools[Four read-only tools]

@@ -8,14 +8,14 @@ Run with `npm run measure` on the development laptop (Apple M1, Node 26.11, SQLi
 | Operation | Median | 95th percentile |
 |---|---|---|
 | List, first page | 0.06 ms | 0.07 ms |
-| List, last page (page 400) | 0.23 ms | 0.25 ms |
-| List, search "sharma" | 4.50 ms | 5.17 ms |
-| List, filter country + department | 1.00 ms | 1.02 ms |
-| List, sort by salary | 0.07 ms | 0.07 ms |
+| List, last page (page 400) | 0.23 ms | 0.24 ms |
+| List, search "sharma" | 9.34 ms | 10.32 ms |
+| List, filter country + department | 1.00 ms | 1.03 ms |
+| List, sort by salary | 0.07 ms | 0.08 ms |
 | Employee detail with history | 0.01 ms | 0.01 ms |
-| Insights, overview | 5.66 ms | 5.96 ms |
-| Insights, breakdown by level | 6.87 ms | 8.19 ms |
-| Insights, outliers | 8.67 ms | 9.93 ms |
+| Insights, overview | 5.55 ms | 6.01 ms |
+| Insights, breakdown by level | 6.83 ms | 8.07 ms |
+| Insights, outliers | 8.43 ms | 9.58 ms |
 
 Seeding 10,000 employees with their first history row takes about 0.11 seconds.
 
@@ -40,7 +40,7 @@ A question takes two model calls: one to ask for a tool, and one to write the an
 | Paging happens in the database (`LIMIT` and `OFFSET`) | The browser receives 25 rows, never 10,000. The page size is capped at 100 by validation. |
 | Indexes on country, department, level, name and USD salary | Filters and the default sort use an index instead of reading every row. |
 | The USD amount is stored on each row (D-014) | Sorting by pay and summing cost need no conversion per row. |
-| Prepared statements, created once | SQLite parses each fixed query once, not on every request. |
+| Fixed statements are prepared once (looking up one employee, and the inserts and updates) | SQLite parses them once and not on every request. The filtered list and the insight queries are built from the filters, so they are prepared per request, which takes microseconds and is included in the times above. |
 | The seed runs in one transaction | About 0.1 seconds, instead of 10,000 separate commits. |
 | The search box waits 300 ms after typing stops | Typing "sharma" sends one request, not six. |
 | The browser caches results per filter (TanStack Query) | Going back to a view already seen shows it at once while it refreshes. |

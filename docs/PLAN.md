@@ -28,12 +28,12 @@ The history is meant to be read from the first commit to the last as the story o
 | 4 | Change a salary | Employee detail, salary change with date and reason, salary history. |
 | 5 | Maintain employees | Add an employee, edit details, mark as left. |
 | 6 | Insights | Overview, breakdown by country, department or level, and outliers. |
-| 7 | Hardening | Error and empty states, edge cases, accessibility pass, measurements in `docs/PERFORMANCE.md`. |
+| 7 | Hardening | Security headers, a clean shutdown, measurements in `docs/PERFORMANCE.md`, test coverage and the architecture diagrams. The accessibility pass and a review of the tests came later, as the adversarial review in `docs/REVIEW.md`. |
 | 8 | Pay assistant (F9) | A panel where the HR Manager asks about pay in plain words. A model can only call four read-only tools over tested code, providers fail over, and limits and a self-emptying cache protect the free allowances. Added after the first plan, and recorded in D-020 to D-023. |
 | 9 | Submission | README, architecture diagram, AI usage log, video demo, final check against `docs/REQUIREMENTS.md`. |
 
 ## Architecture in one paragraph
-One repository with a `server` and a `web` package. The server has four layers: routes (HTTP and input validation), services (use cases such as "change a salary"), repositories (the only place with SQL) and domain (pure functions for the pay rules). The React app talks to the server through a JSON API. In production the server also serves the built React app, so there is one thing to deploy. A diagram follows in `docs/ARCHITECTURE.md` once the skeleton exists.
+One repository with a `server` and a `web` package. The server has four layers: routes (HTTP and input validation), services (use cases such as "change a salary"), repositories (the only place with SQL) and domain (pure functions for the pay rules). The React app talks to the server through a JSON API. In production the server also serves the built React app, so there is one thing to deploy. The diagrams are in `docs/ARCHITECTURE.md`.
 
 ## Test strategy
 | Level | What it covers | Tooling |

@@ -44,7 +44,7 @@ He must understand and be able to explain every line. Optimise for his understan
 5. **Log decisions** in `docs/DECISIONS.md`: context, options, choice, trade-off.
 6. **Keep it simple.** No over-engineering. But production quality: input validation, error handling, sensible structure, tests for business rules and edge cases.
 7. **Git identity:** `Aakash Mishra <theaakashdevsops@gmail.com>` (see the check below). No other account or email.
-8. **No secrets** in the repo. `.env` stays ignored; provide `.env.example`.
+8. **No secrets** in the repo. `.env` stays ignored. Provide `.env.example`.
 9. **Dependencies:** well-known packages only. Check install scripts before adding anything unusual.
 
 ## Default stack (propose and confirm in Stage 0)
@@ -52,7 +52,7 @@ TypeScript end to end, because the role is Node / React / TypeScript:
 - Backend: Node.js with Express or Fastify, input validation with Zod
 - Database: SQLite (the assignment names it). Decide in Stage 0 whether the deploy target needs PostgreSQL instead, and record why
 - UI: React with Vite, or Next.js, with one component library (for example shadcn/ui or MUI)
-- Tests: Vitest; Supertest for API tests; React Testing Library for key UI flows
+- Tests: Vitest, with Supertest for API tests and React Testing Library for key UI flows
 - Tooling: ESLint, Prettier, GitHub Actions running lint and tests
 - Deploy: one simple host that fits the database choice
 

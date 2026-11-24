@@ -21,6 +21,7 @@ Built as a take-home assessment for Incubyte.
 | [Delivery plan](docs/PLAN.md) | The slices in order, the commit conventions and the test strategy. |
 | [Specs](docs/specs/) | Acceptance criteria for each slice, written before its tests. |
 | [Design language](docs/design/README.md) | The design reference, how it is applied in one theme file, and what was left out. |
+| [Adversarial review](docs/REVIEW.md) | How the finished project was reviewed by independent AI reviewers, what they found, and what was done. |
 | [Performance](docs/PERFORMANCE.md) | Measured times with 10,000 employees, and what would change at larger scale. |
 | [How AI was used](docs/AI_USAGE.md) | What I asked, what I kept, what went wrong and how it was caught. |
 | [AI instructions](CLAUDE.md) | The standing instructions the AI tool worked under. |
@@ -54,7 +55,7 @@ The first start creates the database and fills it with 10,000 employees. To rebu
 npm run seed
 ```
 
-The seed is deterministic: every run produces the same 10,000 people, byte for byte.
+The seed is deterministic: every run produces the same 10,000 people. It replaces the data in one step and keeps the database file, so it is safe to run while the server is running.
 
 To run it the way it runs in production, as one process on one port:
 
@@ -77,7 +78,7 @@ The assistant is optional. With no key set, the button is not shown and nothing 
 
 **Setting it up.** Copy `.env.example` to `.env` and fill in at least one key. The file is ignored by git.
 
-| Provider | Free allowance, as measured | Key from |
+| Provider | Free allowance (measured for Groq, Gemini and OpenRouter, from published sources for NVIDIA) | Key from |
 |---|---|---|
 | Groq | 1,000 requests a day and 8,000 tokens a minute, answers in about 1.5 seconds | console.groq.com/keys |
 | Gemini | 20 requests a day and 5 a minute on the main Flash models, and sometimes "high demand" errors | aistudio.google.com/apikey |
@@ -89,9 +90,44 @@ The assistant is optional. With no key set, the button is not shown and nothing 
 
 **Behind a web server.** Visitors are told apart by address. If the app sits behind Apache or nginx, set `TRUST_PROXY=1`. Leave it unset otherwise, because anyone could then claim to be a different visitor.
 
+## Deploying
+The app is one Node process and one SQLite file, so a plain Linux server is enough. These are the steps. They are written for a server where you can install software, and nothing in them is specific to one host.
+
+1. **Install Node 24 or later** (the project is developed on Node 26, see `.nvmrc`). Distribution packages are usually older. The official tarball from nodejs.org, unpacked into the app's own folder, needs no system changes.
+2. **Get the code** and install: `git clone <repository>`, then `npm ci` inside it. Do not leave out the development packages, because the build needs them.
+3. **Build the web app:** `npm run build`. The folder it makes is not in git. Without it the server starts and serves only the API.
+4. **Settings.** Create a `.env` file in the project root (see `.env.example`) and make it readable only by the app's user (`chmod 600 .env`). The ones that matter:
+   - `PORT`, for example `8080`.
+   - `DATABASE_FILE`, a path in a folder the app can write to, ideally outside the code folder, for example `/var/lib/salary-management/salary.sqlite`.
+   - `TRUST_PROXY=1` only if a web server (Apache or nginx) sits in front. The app then listens on `127.0.0.1` only. Leave it unset when people reach the port directly.
+   - Provider keys, only if you want the assistant.
+5. **Run it under a service manager**, as a user that is not root. A minimal systemd unit:
+   ```ini
+   [Unit]
+   Description=Salary Management
+   After=network.target
+
+   [Service]
+   User=salary
+   WorkingDirectory=/opt/salary-management
+   Environment=NODE_ENV=production
+   ExecStart=/opt/salary-management/node/bin/node server/src/index.ts
+   Restart=on-failure
+
+   [Install]
+   WantedBy=multi-user.target
+   ```
+   The first start finds an empty database and fills it with 10,000 employees (about a tenth of a second). Later starts leave the data alone.
+6. **Open the port** in the server's firewall, or point a reverse proxy at it.
+7. **Check it:** `curl http://<server>:<port>/api/health` answers `{"status":"ok"}`, the home page loads, and reloading the Insights page works.
+
+**Updating:** `git pull`, `npm ci`, `npm run build`, then restart the service. The data file is not touched.
+**Backing up:** copy the database file while the service is stopped, or use SQLite's `.backup` command.
+**Stopping:** the service closes the database before it exits when it is asked to stop.
+
 ## Checks
 ```bash
-npm test              # all tests, server and web (about 415, a few seconds)
+npm test              # all tests, server and web (about 635, a few seconds)
 npm run lint          # ESLint
 npm run typecheck     # TypeScript, no output files
 npm run format:check  # Prettier

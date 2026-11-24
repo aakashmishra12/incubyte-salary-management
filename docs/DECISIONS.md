@@ -73,13 +73,13 @@ One entry per decision. Status is Accepted, Proposed (waiting for my review) or 
 - **Context:** SQLite has no median function.
 - **Options considered:** (a) Median in SQL with window functions. (b) Fetch only group and amount for active employees and compute in plain TypeScript functions.
 - **Decision:** (b).
-- **Trade-off:** 10,000 small rows are read per insight request, which is a few milliseconds and will be measured. In return the business rules are pure functions that are tested without a database. At millions of rows this would move into SQL or a summary table.
+- **Trade-off:** 10,000 small rows are read per insight request, which takes 6 to 9 milliseconds (measured in `docs/PERFORMANCE.md`). In return the business rules are pure functions that are tested without a database. At millions of rows this would move into SQL or a summary table.
 
 ## D-011: Work in vertical slices, each with a short spec first
 - **Status:** Accepted, 23 Nov 2026
 - **Context:** The commit history must show how the solution evolved, and the app should be deployable early.
 - **Options considered:** (a) Layer by layer: all of the database, then all of the API, then all of the UI. (b) Feature by feature, each from database to screen.
-- **Decision:** (b). Each slice starts with acceptance criteria in `docs/specs/`, then a failing test, then the code, then a refactor. The app is deployed from the first slice.
+- **Decision:** (b). Each slice starts with acceptance criteria in `docs/specs/`, then a failing test, then the code, then a refactor. The app is deployable from the first slice, and is deployed at submission.
 - **Trade-off:** Some early code is revisited when a later slice needs more from it. Every commit leaves a working app, and nothing is integrated late.
 
 ## D-012: Hosting on a VPS
@@ -87,7 +87,7 @@ One entry per decision. Status is Accepted, Proposed (waiting for my review) or 
 - **Context:** The app must be deployed and working. SQLite is a file, so the host needs a disk that survives restarts.
 - **Options considered:** (a) A free platform host. Deploys on every push, and the free tier has no persistent disk and sleeps when idle, so the first visit is slow and edits are lost on restart. (b) A Linux VPS I have access to, running the Node process behind the web server that is already there.
 - **Decision:** (b). The app still seeds itself when the database is empty, so a fresh server needs one command.
-- **Trade-off:** Setup and updates are manual steps that a platform would do for me, and they are written down in the README. In return the data persists, there is no cold start during a review, and the deployment is something I can explain end to end.
+- **Trade-off:** Setup and updates are manual steps that a platform would do for me, and they are written down in the README, under "Deploying". In return the data persists, there is no cold start during a review, and the deployment is something I can explain end to end.
 
 ## D-013: TypeScript 6.0, run directly by Node on the server
 - **Status:** Accepted, 23 Nov 2026
@@ -151,6 +151,7 @@ One entry per decision. Status is Accepted, Proposed (waiting for my review) or 
 - **Decision:** (b). Providers are tried in order. A limited or failing provider is skipped for a cooling-off time. Each has a daily budget of calls that counts failed attempts too, because OpenRouter's free tier counts them.
 - **Trade-off:** I wrote about 100 lines of client instead of using an SDK, and use only the features all providers share. In return a provider can be added or dropped with settings, and no provider's outage or limit ends the feature.
 - **What live testing taught me:**
+  - Groq, Gemini and OpenRouter were called with real keys. NVIDIA was not: its figures come from published documentation and forum reports, and its default model name is unverified.
   - Gemini's free Flash models allow only 20 requests a day and 5 a minute, and answered with "503 high demand" in several of my tests. Groq answered in under half a second with a 1,000 a day allowance. Groq is therefore first in the default order. The daily budgets are set from these facts and not from guesses.
   - Gemini 3 attaches a "thought signature" to each tool call and refuses the tool result with a 400 if it is not sent back. The client keeps the signature and sends it back to the same provider only. For a tool call that another provider made, a documented placeholder is sent, so switching providers in the middle of a question is safe.
   - A 400 means one request was refused, not that the provider is broken. It cools the provider for five minutes and is logged. Only a wrong key or model name (401, 403, 404) blocks it for an hour.
@@ -163,9 +164,24 @@ One entry per decision. Status is Accepted, Proposed (waiting for my review) or 
 - **Decision:** 20 new questions per visitor per hour and 300 per day overall, both settings. A repeated first question is answered from a cache of at most 100 answers for at most an hour, keyed by the question and by SQLite's count of rows changed on the connection, so any data change empties the cache without any code having to remember to.
 - **Trade-off:** Limits and cache are in memory, so a restart resets them, and visitors are told apart by IP address, so people behind one office address share an allowance. A durable counter would need a table, which is more than a demo needs.
 
+- **Known exposure (found by the review, accepted):** the limits count questions, but a question can use up to four model calls, and a visitor can choose one provider by hand. Aimed at the smallest budgets (Gemini 18 a day, OpenRouter 45), one visitor can use a provider up for everyone for the rest of the UTC day in about 5 to 12 questions. The other providers then carry on, so the assistant keeps working, and the daily budgets are what stop this from costing money. A per-visitor budget of model calls would close it, and it is listed under what I would add next.
+
 ## D-023: What the model is allowed to see
 - **Status:** Accepted, 24 Nov 2026
 - **Context:** Questions and tool results are sent to an outside service. Some free tiers log prompts or may train on them.
 - **Decision:** The tools return totals and breakdowns, and the outlier and search tools return at most 10 named employees per call. All data in this app is generated. Keys live in the server's environment only.
 - **Trade-off:** Fine for generated data. For real salary data I would send aggregates only, and use a provider with a data processing agreement and no training on inputs.
+
+## D-024: Check the figures in an answer, because the instructions alone cannot guarantee them
+- **Status:** Accepted, 24 Nov 2026
+- **Context:** D-020 says the model never produces a number, but only the tool side of that is enforced by code. A model can still write a figure it made up, rounded or calculated. The adversarial review found that the code and the docs claimed more than they did.
+- **Options considered:** (a) Trust the instructions and say so. (b) Check every figure in an answer against the data the answer used, and flag what is not there. (c) Withhold any answer with an unmatched figure.
+- **Decision:** (b). Figures of three digits or more, and decimals, must appear in a tool result, the question, the conversation or today's date. A figure that does not is named in a note on the answer, and the answer is not remembered.
+- **Trade-off:** A legitimate derived figure, such as a difference the model worked out correctly, is also flagged, which is the point, because the instructions forbid calculating. Small whole numbers are ignored, so a wrong count under 100 would pass. Withholding the answer (c) would be safer and would also hide correct text, so the HR Manager is warned and not blocked.
+
+## D-025: Where the design reference was changed for accessibility
+- **Status:** Accepted, 24 Nov 2026
+- **Context:** The design reference (D-019) is a visual language, and WCAG AA is a requirement for text and controls. The review measured the ratios and some of the reference's values fail.
+- **Decision:** Keep the look, and strengthen only what fails. Muted text is #666 (the reference's #888 is 3.5 to 1, and 4.5 is needed). Links use the reference's own deeper blue and errors its deeper red, because the lighter ones are just under 4.5 on the off-white page. Input borders are #8a8a8a (3.4 to 1, was 1.2, and 3 is needed). Keyboard focus gets a 2px ink ring, animations stop for people who ask for less motion, and text is sized in rem.
+- **Trade-off:** The look is slightly heavier than the reference. `web/src/theme.test.ts` computes the ratios, so a later change that makes text unreadable fails a test.
 
