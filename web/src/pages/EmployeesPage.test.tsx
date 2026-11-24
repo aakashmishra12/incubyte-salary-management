@@ -250,14 +250,14 @@ describe('EmployeesPage: addresses that are wrong', () => {
     const requests = stubApi({
       'GET /api/reference': () => reference,
       'GET /api/employees': (url) =>
-        url.searchParams.get('pageSize') === '1000'
+        url.searchParams.get('country') === 'XX'
           ? new Response(
-              '{"error":"Invalid request","issues":[{"field":"pageSize","message":"Too big"}]}',
+              '{"error":"Invalid request","issues":[{"field":"country","message":"Invalid option"}]}',
               { status: 400 },
             )
           : pageOf([anEmployee()]),
     });
-    renderPage(<EmployeesPage />, { route: '/?pageSize=1000&country=IN' });
+    renderPage(<EmployeesPage />, { route: '/?country=XX&search=ken' });
 
     expect(
       await screen.findByText('Some of the filters in the address are not valid.'),

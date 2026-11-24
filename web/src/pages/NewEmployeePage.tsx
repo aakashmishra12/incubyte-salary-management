@@ -5,6 +5,7 @@ import { useCreateEmployee, useReference } from '../api/queries.ts';
 import { fieldErrorsFrom, formErrorFrom, SelectField } from '../components/formHelpers.tsx';
 import { todayIso } from '../format/date.ts';
 import { parseMoney } from '../format/money.ts';
+import { useBackToList } from './backToList.ts';
 
 const EMPTY_FORM = {
   firstName: '',
@@ -25,6 +26,7 @@ export function NewEmployeePage() {
   const reference = useReference();
   const create = useCreateEmployee();
   const navigate = useNavigate();
+  const backToList = useBackToList();
   const [values, setValues] = useState(EMPTY_FORM);
   const [localErrors, setLocalErrors] = useState<Partial<Record<Field, string>>>({});
 
@@ -78,7 +80,7 @@ export function NewEmployeePage() {
 
   return (
     <Stack spacing={3} sx={{ maxWidth: 720 }}>
-      <Link component={RouterLink} to="/" underline="hover">
+      <Link component={RouterLink} to={backToList} underline="hover">
         Back to employees
       </Link>
       <Typography variant="h5" component="h1">
@@ -161,7 +163,7 @@ export function NewEmployeePage() {
             </Box>
 
             <Stack direction="row" spacing={1} sx={{ justifyContent: 'flex-end' }}>
-              <Button component={RouterLink} to="/">
+              <Button component={RouterLink} to={backToList}>
                 Cancel
               </Button>
               <Button type="submit" variant="contained" disabled={create.isPending}>

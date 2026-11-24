@@ -16,6 +16,7 @@ import {
   Typography,
 } from '@mui/material';
 import { useState, type ReactNode } from 'react';
+import { useBackToList } from './backToList.ts';
 import { Link as RouterLink, useParams } from 'react-router';
 import { useEmployee, useReference } from '../api/queries.ts';
 import { ChangeSalaryDialog } from '../components/ChangeSalaryDialog.tsx';
@@ -181,7 +182,7 @@ export function EmployeeDetailPage() {
 
 function BackLink() {
   return (
-    <Link component={RouterLink} to="/" underline="hover">
+    <Link component={RouterLink} to={useBackToList()} underline="hover">
       Back to employees
     </Link>
   );

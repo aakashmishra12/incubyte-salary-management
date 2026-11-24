@@ -19,13 +19,47 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import { useEffect, useState } from 'react';
-import { Link as RouterLink, useSearchParams } from 'react-router';
+import { useCallback, useEffect, useState } from 'react';
+import { Link as RouterLink, useLocation, useSearchParams } from 'react-router';
+import { ApiError } from '../api/client.ts';
 import { useEmployees, useReference } from '../api/queries.ts';
+import { formatDate } from '../format/date.ts';
 import { formatMoney, formatUsd } from '../format/money.ts';
 
 const DEFAULT_PAGE_SIZE = 25;
+const PAGE_SIZES = [10, 25, 50, 100];
 const SEARCH_DELAY_MS = 300;
+
+const SORTS = ['name', 'employeeCode', 'hireDate', 'country', 'department', 'level', 'salary'];
+
+/** A whole number from 1 up to `max`, or undefined if the text is anything else. */
+function wholeNumber(text: string | null, max = Infinity): number | undefined {
+  if (text === null || !/^\d+$/.test(text)) return undefined;
+  const value = Number(text);
+  return value >= 1 && value <= max ? value : undefined;
+}
+
+/**
+ * The address can be typed or bookmarked by anyone, so what is sent to the server is checked first.
+ * A page of -4 or a page size of "abc" is simply left out, and the filters are passed on as they are
+ * (the server checks them, and the page says so if it refuses).
+ */
+function paramsForServer(params: URLSearchParams): URLSearchParams {
+  const clean = new URLSearchParams();
+  for (const name of ['search', 'country', 'department', 'level', 'status']) {
+    const value = params.get(name);
+    if (value) clean.set(name, value);
+  }
+  const sort = params.get('sort');
+  if (sort && SORTS.includes(sort)) clean.set('sort', sort);
+  const order = params.get('order');
+  if (order === 'asc' || order === 'desc') clean.set('order', order);
+  const page = wholeNumber(params.get('page'));
+  if (page) clean.set('page', String(page));
+  const pageSize = wholeNumber(params.get('pageSize'), 100);
+  if (pageSize) clean.set('pageSize', String(pageSize));
+  return clean;
+}
 
 /** The columns of the table. `sort` is the name the API knows the column by, when sortable. */
 const COLUMNS: { label: string; sort?: string; align?: 'right' }[] = [
@@ -35,6 +69,7 @@ const COLUMNS: { label: string; sort?: string; align?: 'right' }[] = [
   { label: 'Department', sort: 'department' },
   { label: 'Level', sort: 'level' },
   { label: 'Country', sort: 'country' },
+  { label: 'Hired', sort: 'hireDate' },
   { label: 'Status' },
   { label: 'Salary', sort: 'salary', align: 'right' },
 ];
@@ -43,35 +78,53 @@ export function EmployeesPage() {
   // The filters live in the address bar (?country=IN&page=2), not in component state.
   // That makes a view bookmarkable, and the back button undoes a filter.
   const [params, setParams] = useSearchParams();
-  const employees = useEmployees(params);
+  const location = useLocation();
+  const serverParams = paramsForServer(params);
+  const employees = useEmployees(serverParams);
   const reference = useReference();
 
-  const sort = params.get('sort') ?? 'name';
-  const order = params.get('order') ?? 'asc';
-  const page = Number(params.get('page') ?? 1);
-  const pageSize = Number(params.get('pageSize') ?? DEFAULT_PAGE_SIZE);
+  const sort = serverParams.get('sort') ?? 'name';
+  const order = serverParams.get('order') ?? 'asc';
+  const page = Number(serverParams.get('page') ?? 1);
+  const pageSize = Number(serverParams.get('pageSize') ?? DEFAULT_PAGE_SIZE);
 
-  /** Changes filters in the address bar. Any change except paging goes back to page 1. */
-  function update(changes: Record<string, string>, keepPage = false) {
-    const next = new URLSearchParams(params);
-    for (const [name, value] of Object.entries(changes)) {
-      if (value) next.set(name, value);
-      else next.delete(name);
-    }
-    if (!keepPage) next.delete('page');
-    setParams(next);
-  }
+  /**
+   * Changes filters in the address bar. Any change except paging goes back to page 1.
+   * It builds on the address as it is at that moment (the function form), not on the address
+   * as it was when this page last drew, so two changes close together cannot undo each other.
+   */
+  const update = useCallback(
+    (changes: Record<string, string>, keepPage = false) => {
+      setParams((current) => {
+        const next = new URLSearchParams(current);
+        for (const [name, value] of Object.entries(changes)) {
+          if (value) next.set(name, value);
+          else next.delete(name);
+        }
+        if (!keepPage) next.delete('page');
+        return next;
+      });
+    },
+    [setParams],
+  );
 
   // The search box updates as you type, but the request waits until you pause,
   // so typing "sharma" sends one request instead of six.
-  const [searchText, setSearchText] = useState(params.get('search') ?? '');
+  const urlSearch = params.get('search') ?? '';
+  const [searchText, setSearchText] = useState(urlSearch);
+  // When the address changes by itself (the Back button, the Employees link), the box follows it.
+  // React's advice for this is to adjust the state while drawing, not in an effect: remember which
+  // address the box last matched, and when the address is different, take its search text.
+  const [matchedUrlSearch, setMatchedUrlSearch] = useState(urlSearch);
+  if (urlSearch !== matchedUrlSearch) {
+    setMatchedUrlSearch(urlSearch);
+    setSearchText(urlSearch);
+  }
   useEffect(() => {
-    if (searchText === (params.get('search') ?? '')) return;
+    if (searchText === urlSearch) return;
     const timer = setTimeout(() => update({ search: searchText }), SEARCH_DELAY_MS);
     return () => clearTimeout(timer);
-    // Only re-run when the text changes. `update` is recreated on every render.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchText]);
+  }, [searchText, urlSearch, update]);
 
   function sortBy(column: string) {
     if (sort === column) {
@@ -96,7 +149,12 @@ export function EmployeesPage() {
             {employees.data ? countLabel(employees.data.total) : ' '}
           </Typography>
         </Box>
-        <Button variant="contained" component={RouterLink} to="/employees/new">
+        <Button
+          variant="contained"
+          component={RouterLink}
+          to="/employees/new"
+          state={{ from: `${location.pathname}${location.search}` }}
+        >
           Add employee
         </Button>
       </Stack>
@@ -139,17 +197,32 @@ export function EmployeesPage() {
         />
       </Stack>
 
-      {employees.isError && (
+      {employees.isError &&
+      employees.error instanceof ApiError &&
+      employees.error.status === 400 ? (
         <Alert
-          severity="error"
+          severity="warning"
           action={
-            <Button color="inherit" size="small" onClick={() => employees.refetch()}>
-              Try again
+            <Button color="inherit" size="small" onClick={() => setParams(new URLSearchParams())}>
+              Clear the filters
             </Button>
           }
         >
-          The employee list could not be loaded.
+          Some of the filters in the address are not valid.
         </Alert>
+      ) : (
+        employees.isError && (
+          <Alert
+            severity="error"
+            action={
+              <Button color="inherit" size="small" onClick={() => employees.refetch()}>
+                Try again
+              </Button>
+            }
+          >
+            The employee list could not be loaded.
+          </Alert>
+        )
       )}
 
       <Paper variant="outlined">
@@ -185,7 +258,13 @@ export function EmployeesPage() {
                 <TableRow key={employee.id} hover>
                   <TableCell>{employee.employeeCode}</TableCell>
                   <TableCell>
-                    <Link component={RouterLink} to={`/employees/${employee.id}`} underline="hover">
+                    <Link
+                      component={RouterLink}
+                      to={`/employees/${employee.id}`}
+                      // So that "Back to employees" returns to this very view, filters and all.
+                      state={{ from: `${location.pathname}${location.search}` }}
+                      underline="hover"
+                    >
                       {employee.firstName} {employee.lastName}
                     </Link>
                   </TableCell>
@@ -193,6 +272,7 @@ export function EmployeesPage() {
                   <TableCell>{employee.department}</TableCell>
                   <TableCell>{employee.level}</TableCell>
                   <TableCell>{countryName(employee.country)}</TableCell>
+                  <TableCell>{formatDate(employee.hireDate)}</TableCell>
                   <TableCell>
                     <Chip
                       size="small"
@@ -218,7 +298,19 @@ export function EmployeesPage() {
               {employees.data?.items.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={COLUMNS.length} align="center" sx={{ py: 6 }}>
-                    No employees match these filters.
+                    {employees.data.total > 0 ? (
+                      <Stack spacing={1} sx={{ alignItems: 'center' }}>
+                        <span>
+                          There is no page {page}. The last page is{' '}
+                          {Math.ceil(employees.data.total / pageSize)}.
+                        </span>
+                        <Button size="small" onClick={() => update({ page: '' }, true)}>
+                          Go to the first page
+                        </Button>
+                      </Stack>
+                    ) : (
+                      'No employees match these filters.'
+                    )}
                   </TableCell>
                 </TableRow>
               )}
@@ -231,7 +323,7 @@ export function EmployeesPage() {
           // The API counts pages from 1. This component counts from 0.
           page={employees.data ? page - 1 : 0}
           rowsPerPage={pageSize}
-          rowsPerPageOptions={[10, 25, 50, 100]}
+          rowsPerPageOptions={PAGE_SIZES}
           onPageChange={(_event, newPage) =>
             update({ page: newPage === 0 ? '' : String(newPage + 1) }, true)
           }
