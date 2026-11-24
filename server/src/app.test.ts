@@ -65,3 +65,41 @@ describe('security headers', () => {
     expect(response.headers['x-powered-by']).toBeUndefined();
   });
 });
+
+describe('requests that Express cannot read', () => {
+  it('answers a body over the size limit with 413, not 500, and does not log it as a bug', async () => {
+    const logged: unknown[] = [];
+    const app = createApp({ db, logError: (error) => logged.push(error) });
+
+    const response = await request(app)
+      .post('/api/employees')
+      .send({ firstName: 'x'.repeat(200_000) });
+
+    expect(response.status).toBe(413);
+    expect(response.body).toEqual({ error: 'The request is too large' });
+    expect(logged).toEqual([]);
+  });
+
+  it('answers a badly encoded address with 400, not 500, and does not log it as a bug', async () => {
+    const logged: unknown[] = [];
+    const app = createApp({ db, logError: (error) => logged.push(error) });
+
+    const response = await request(app).get('/api/employees/%E0%A4%A');
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({ error: 'The request could not be read' });
+    expect(logged).toEqual([]);
+  });
+
+  it('still answers a real server fault with 500, and does log it', async () => {
+    const { db: broken } = aDatabaseWith();
+    const logged: unknown[] = [];
+    const app = createApp({ db: broken, logError: (error) => logged.push(error) });
+    broken.close();
+
+    const response = await request(app).get('/api/employees');
+
+    expect(response.status).toBe(500);
+    expect(logged).toHaveLength(1);
+  });
+});
