@@ -93,7 +93,10 @@ export function createAssistantTools({
           const problems = parsed.error.issues.map(
             (i) => `${i.path.join('.') || 'arguments'}: ${i.message}`,
           );
-          return fail(`Invalid arguments. ${problems.join('; ')}`);
+          // Say what the tool does accept, so the model can correct itself in one step.
+          const shape = (spec.schema as unknown as { shape?: Record<string, unknown> }).shape;
+          const allowed = shape ? Object.keys(shape).join(', ') || 'none' : 'none';
+          return fail(`Invalid arguments. ${problems.join('. ')}. Allowed arguments: ${allowed}.`);
         }
         const { data, source } = spec.execute(parsed.data);
         return { content: JSON.stringify(data), isError: false, source };
@@ -106,7 +109,7 @@ export function createAssistantTools({
       name: 'get_overview',
       description:
         'Company totals for active employees: headcount and total annual salary cost, overall and for each country, with the share of cost each country accounts for. Use it for questions about how much the company spends or how many people it pays.',
-      schema: z.object({}),
+      schema: z.strictObject({}),
       execute: () => {
         const overview = insights.overview();
         return {
@@ -132,7 +135,7 @@ export function createAssistantTools({
       name: 'get_breakdown',
       description:
         'Lowest, median, average and highest annual salary, and the number of active employees, for each country, department or level. Narrow it with country, department and level filters, for example to compare one role across countries. Use it for questions about what people typically earn.',
-      schema: z.object({
+      schema: z.strictObject({
         groupBy: z
           .enum(['country', 'department', 'level'])
           .default('country')
@@ -189,7 +192,7 @@ export function createAssistantTools({
       name: 'get_outliers',
       description:
         'Employees paid far above or below the median of their peers (same country, department and level). Returns the most extreme first, with their salary, the peer median, the compa-ratio and the number of peers. Use it for questions about who is overpaid, underpaid or out of line.',
-      schema: z.object({
+      schema: z.strictObject({
         direction: z
           .enum(['below', 'above'])
           .describe('Only people paid below, or above, their peers.')
@@ -235,28 +238,40 @@ export function createAssistantTools({
     defineTool({
       name: 'find_employees',
       description:
-        'Looks up individual employees by name, email or employee ID, with optional filters, and can sort by salary or hire date. Returns at most 10 people. Use it for questions about specific people, or about the highest or lowest paid.',
-      schema: z.object({
+        'Looks up individual employees by name, email or employee ID, with optional filters, and can sort by salary or hire date. Returns at most 10 active people unless status says otherwise. Use it for questions about specific people, or about the highest or lowest paid.',
+      schema: z.strictObject({
         search: z.string().max(100).describe('Part of a name, email or employee ID.').optional(),
         country,
         department,
         level,
-        status: z.enum(['active', 'left']).describe('Leave out to include both.').optional(),
+        status: z
+          .enum(['active', 'left', 'any'])
+          .default('active')
+          .describe(
+            'Active people only by default. Use left for people who have left, or any for both.',
+          ),
         sort: z
           .enum(['name', 'salary_desc', 'salary_asc', 'hire_date_newest', 'hire_date_oldest'])
           .default('name')
           .describe('salary_desc is highest paid first. Salary sorts compare USD equivalents.'),
         limit: limit(5),
       }),
-      execute: ({ limit: rows, sort, ...filter }) => {
+      execute: ({ limit: rows, sort, status, ...filter }) => {
         const order = SORTS[sort];
-        const page = employees.list({ ...filter, ...order.query, page: 1, pageSize: rows });
+        const page = employees.list({
+          ...filter,
+          ...(status === 'any' ? {} : { status }),
+          ...order.query,
+          page: 1,
+          pageSize: rows,
+        });
         const parts = [
           filter.search && `"${filter.search}"`,
           filter.country && COUNTRIES[filter.country].name,
           filter.department,
           filter.level,
-          filter.status,
+          status !== 'active' &&
+            (status === 'left' ? 'people who left' : 'including people who left'),
           order.label,
         ].filter(Boolean);
 
