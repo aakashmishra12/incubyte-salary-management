@@ -261,15 +261,18 @@ describe('find_employees', () => {
     });
   });
 
-  it('includes people who have left only when asked', () => {
+  it('leaves out people who have left unless asked, like every other tool and the instructions say', () => {
     const { tools } = setup([
       anEmployee({ firstName: 'Gone', status: 'left', leftOn: '2025-01-01' }),
+      anEmployee({ firstName: 'Here' }),
     ]);
 
-    expect(run(tools, 'find_employees', { search: 'gone' }).data.totalMatches).toBe(1);
-    expect(
-      run(tools, 'find_employees', { search: 'gone', status: 'active' }).data.totalMatches,
-    ).toBe(0);
+    const names = (args: object) =>
+      run(tools, 'find_employees', args).data.items.map((i: { name: string }) => i.name);
+
+    expect(names({})).toEqual(['Here Rao']);
+    expect(names({ status: 'left' })).toEqual(['Gone Rao']);
+    expect(names({ status: 'any', sort: 'name' }).sort()).toEqual(['Gone Rao', 'Here Rao']);
   });
 
   it('returns at most ten people', () => {
@@ -277,6 +280,65 @@ describe('find_employees', () => {
 
     expect(run(tools, 'find_employees', { limit: 10 }).data.items).toHaveLength(10);
     expect(run(tools, 'find_employees', { limit: 11 }).isError).toBe(true);
+  });
+});
+
+describe('find_employees sorting', () => {
+  const staff = () => [
+    anEmployee({ firstName: 'Mid', salaryMinor: 100_000_00, hireDate: '2021-05-01' }),
+    anEmployee({ firstName: 'Top', salaryMinor: 200_000_00, hireDate: '2023-05-01' }),
+    anEmployee({ firstName: 'Low', salaryMinor: 50_000_00, hireDate: '2019-05-01' }),
+  ];
+  const order = (sort: string) =>
+    run(setup(staff()).tools, 'find_employees', { sort, limit: 3 }).data.items.map(
+      (i: { name: string }) => i.name.split(' ')[0],
+    );
+
+  it('puts the lowest paid first for salary_asc, and the highest first for salary_desc', () => {
+    expect(order('salary_asc')).toEqual(['Low', 'Mid', 'Top']);
+    expect(order('salary_desc')).toEqual(['Top', 'Mid', 'Low']);
+  });
+
+  it('puts the newest hire first for hire_date_newest, and the oldest first for hire_date_oldest', () => {
+    expect(order('hire_date_newest')).toEqual(['Top', 'Mid', 'Low']);
+    expect(order('hire_date_oldest')).toEqual(['Low', 'Mid', 'Top']);
+  });
+
+  it('puts people in name order by default', () => {
+    expect(order('name')).toEqual(['Low', 'Mid', 'Top']);
+  });
+});
+
+describe('loose arguments from the model', () => {
+  const { tools } = setup([
+    anEmployee({
+      firstName: 'Kenji',
+      country: 'JP',
+      currency: 'JPY',
+      department: 'Engineering',
+      level: 'L3',
+      salaryMinor: 9_000_000,
+    }),
+    anEmployee({ firstName: 'Other', country: 'US', department: 'Sales', level: 'L1' }),
+  ]);
+  const matches = (args: object) => run(tools, 'find_employees', args).data.totalMatches;
+
+  it.each([
+    ['a country code in lower case', { country: 'jp' }],
+    ['a country name in any case', { country: 'JAPAN' }],
+    ['a department in capitals', { department: 'ENGINEERING' }],
+    ['a level in lower case', { level: 'l3' }],
+    ['a sort in capitals', { sort: 'SALARY_DESC' }],
+    ['empty text where nothing was meant', { country: '', department: '', search: '' }],
+    ['null where nothing was meant', { country: null, level: null }],
+    ['spaces around a value', { country: '  Japan  ' }],
+  ])('accepts %s', (_what, args) => {
+    expect(run(tools, 'find_employees', args).isError).toBe(false);
+    expect(matches(args)).toBeGreaterThan(0);
+  });
+
+  it('narrows to the right person when the filter is given loosely', () => {
+    expect(matches({ country: 'japan', department: 'engineering', level: 'l3' })).toBe(1);
   });
 });
 
@@ -300,6 +362,15 @@ describe('when the model makes a mistake', () => {
     expect(result.isError).toBe(true);
     expect(result.data.error).toContain('country');
     expect(result.data.error).toContain('IN');
+  });
+
+  it('refuses a filter the tool does not have, instead of ignoring it and returning everyone', () => {
+    const result = run(tools, 'find_employees', { search: 'rao', salary_min: 5_000_000 });
+
+    expect(result.isError).toBe(true);
+    expect(result.data.error).toContain('salary_min');
+    expect(result.data.error).toContain('Allowed arguments');
+    expect(result.data.error).toContain('country');
   });
 
   it('treats empty arguments as no arguments', () => {
