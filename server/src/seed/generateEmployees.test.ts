@@ -72,6 +72,15 @@ describe('generateEmployees', () => {
       expect(outliers.length).toBeLessThan(active.length * 0.1);
     });
 
+    it('never hires anyone after the day the data was made, which the API would refuse', () => {
+      const latest = employees
+        .map((e) => e.hireDate)
+        .sort()
+        .at(-1)!;
+
+      expect(latest <= '2026-11-01').toBe(true);
+    });
+
     it('marks a few people as having left, on or after the day they were hired', () => {
       const left = employees.filter((e) => e.status === 'left');
 

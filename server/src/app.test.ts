@@ -59,6 +59,12 @@ describe('security headers', () => {
     expect(response.headers['content-security-policy']).toContain("default-src 'self'");
   });
 
+  it('does not tell browsers to upgrade requests to https, which would break the app served over plain http', async () => {
+    const response = await request(createApp({ db })).get('/api/health');
+
+    expect(response.headers['content-security-policy']).not.toContain('upgrade-insecure-requests');
+  });
+
   it('does not announce which framework the server runs', async () => {
     const response = await request(createApp({ db })).get('/api/health');
 

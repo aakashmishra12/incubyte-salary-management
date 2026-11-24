@@ -8,6 +8,9 @@ import {
   type ToolCall,
 } from './types.ts';
 
+/** How long to wait for a provider before giving up on it. Asserted in a test, because the spec promises it. */
+export const PROVIDER_TIMEOUT_MS = 30_000;
+
 export interface ProviderClientOptions {
   id: ProviderId;
   label: string;
@@ -35,7 +38,7 @@ export function createOpenAiCompatibleClient({
   model,
   extraBody,
   fetch: fetchFn = fetch,
-  timeoutMs = 30_000,
+  timeoutMs = PROVIDER_TIMEOUT_MS,
 }: ProviderClientOptions): ModelClient {
   async function call(request: ModelRequest, signal: AbortSignal): Promise<ModelReply> {
     const response = await fetchFn(`${baseUrl}/chat/completions`, {

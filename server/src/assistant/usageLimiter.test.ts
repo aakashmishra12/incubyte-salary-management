@@ -102,6 +102,40 @@ describe('createUsageLimiter', () => {
     expect(limiter.trackedVisitors()).toBe(1);
   });
 
+  it('says a refused visitor can try again when the earliest hour in the table ends', () => {
+    const clock = aClock();
+    const limiter = createUsageLimiter({
+      perVisitorPerHour: 3,
+      perDay: 100_000,
+      maxVisitors: 2,
+      clock: clock.now,
+    });
+    limiter.tryUse('a');
+    clock.advance(600);
+    limiter.tryUse('b');
+    clock.advance(60);
+
+    // 'a' started 660 seconds ago, so its hour ends in 2,940 seconds.
+    expect(limiter.tryUse('c')).toEqual({
+      allowed: false,
+      reason: 'busy',
+      retryAfterSeconds: 2_940,
+    });
+  });
+
+  it('rounds the wait up to a whole second, so a visitor is never told to retry too early', () => {
+    const clock = aClock();
+    const limiter = createUsageLimiter({ ...limits, clock: clock.now });
+    for (let i = 0; i < 3; i++) limiter.tryUse('a');
+    clock.advance(3_599.5);
+
+    expect(limiter.tryUse('a')).toMatchObject({
+      allowed: false,
+      reason: 'visitor',
+      retryAfterSeconds: 1,
+    });
+  });
+
   it('refuses new visitors rather than growing past the limit when all are recent', () => {
     const limiter = createUsageLimiter({
       perVisitorPerHour: 3,

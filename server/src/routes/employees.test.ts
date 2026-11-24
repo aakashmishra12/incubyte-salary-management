@@ -66,6 +66,62 @@ describe('GET /api/employees', () => {
   });
 });
 
+describe('how long the text in a request may be', () => {
+  const body = (overrides: object) => ({
+    firstName: 'Mei',
+    lastName: 'Tanaka',
+    email: 'mei@acme.example',
+    country: 'JP',
+    department: 'Design',
+    level: 'L2',
+    jobTitle: 'Designer',
+    hireDate: '2026-11-03',
+    salaryMinor: 7_000_000,
+    ...overrides,
+  });
+
+  it.each([
+    ['a first name over 100 characters', { firstName: 'x'.repeat(101) }, 'firstName'],
+    ['a last name over 100 characters', { lastName: 'x'.repeat(101) }, 'lastName'],
+    ['a job title over 100 characters', { jobTitle: 'x'.repeat(101) }, 'jobTitle'],
+    ['an email over 200 characters', { email: `${'x'.repeat(200)}@acme.example` }, 'email'],
+  ])('refuses %s', async (_what, overrides, field) => {
+    const response = await request(appWith([])).post('/api/employees').send(body(overrides));
+
+    expect(response.status).toBe(400);
+    expect(response.body.issues.map((i: { field: string }) => i.field)).toEqual([field]);
+  });
+
+  it('accepts text exactly at the limit', async () => {
+    const response = await request(appWith([]))
+      .post('/api/employees')
+      .send(body({ firstName: 'x'.repeat(100) }));
+
+    expect(response.status).toBe(201);
+  });
+
+  it('refuses a search over 100 characters, and a reason under 3 or over 200', async () => {
+    const { app, id } = (() => {
+      const { db, ids } = aDatabaseWith([anEmployee({ hireDate: '2020-01-15' })]);
+      return { app: createApp({ db, clock: () => new Date(TEST_NOW) }), id: ids[0] };
+    })();
+
+    expect(
+      (
+        await request(app)
+          .get('/api/employees')
+          .query({ search: 'x'.repeat(101) })
+      ).status,
+    ).toBe(400);
+    for (const reason of ['ab', 'x'.repeat(201)]) {
+      const response = await request(app)
+        .post(`/api/employees/${id}/salary-changes`)
+        .send({ newSalaryMinor: 1_000_00, effectiveDate: '2026-11-01', reason });
+      expect(response.status).toBe(400);
+    }
+  });
+});
+
 describe('GET /api/reference', () => {
   it('returns the fixed lists the filters need', async () => {
     const response = await request(appWith([])).get('/api/reference');

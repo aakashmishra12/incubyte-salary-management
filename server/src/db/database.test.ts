@@ -96,4 +96,22 @@ describe('openDatabase', () => {
         .run(),
     ).toThrow(/FOREIGN KEY constraint failed/);
   });
+
+  it('turns on foreign key checks itself, and does not rely on a library default', () => {
+    expect(openDatabase(':memory:').pragma('foreign_keys', { simple: true })).toBe(1);
+  });
+
+  it('has the index that sorting by pay relies on, and uses it', () => {
+    const db = openDatabase(':memory:');
+
+    const indexes = db.pragma('index_list(employees)') as { name: string }[];
+    const plan = db
+      .prepare(
+        'EXPLAIN QUERY PLAN SELECT id FROM employees ORDER BY salary_usd_minor DESC LIMIT 25',
+      )
+      .all() as { detail: string }[];
+
+    expect(indexes.map((i) => i.name)).toContain('idx_employees_salary_usd');
+    expect(plan.map((p) => p.detail).join(' ')).toContain('idx_employees_salary_usd');
+  });
 });

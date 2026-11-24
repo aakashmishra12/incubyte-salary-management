@@ -402,6 +402,20 @@ describe('the answer cache', () => {
   });
 });
 
+describe('the usage limits and the answer cache together', () => {
+  it('still gives a remembered answer to someone with no questions left, because it costs nothing', async () => {
+    const failover = aFailover(said('Nine thousand.'));
+    const { ask } = setup(failover, { perHour: 1 });
+    await ask('How many?');
+
+    const again = await ask('How many?');
+
+    expect(again).toMatchObject({ answer: 'Nine thousand.', cached: true, remainingThisHour: 0 });
+    // But a new question is refused, because there is no allowance left for it.
+    await expect(ask('A different question')).rejects.toBeInstanceOf(UsageLimitError);
+  });
+});
+
 describe('the usage limits', () => {
   it('refuses a question over the hourly limit, with when to try again, and does not call a model', async () => {
     const failover = aFailover(said('Hi'));

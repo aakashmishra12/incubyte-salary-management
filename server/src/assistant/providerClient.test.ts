@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { createOpenAiCompatibleClient } from './providerClient.ts';
+import { createOpenAiCompatibleClient, PROVIDER_TIMEOUT_MS } from './providerClient.ts';
+import { afterEach, vi } from 'vitest';
 import { ProviderError, type ModelRequest } from './types.ts';
 
 const SECRET = 'sk-secret-key-123';
@@ -448,5 +449,113 @@ describe('createOpenAiCompatibleClient: Gemini thought signatures', () => {
     );
 
     expect(sentToolCall(calls)).not.toHaveProperty('extra_content');
+  });
+});
+
+describe('createOpenAiCompatibleClient: time limits and clean-up', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('waits up to 30 seconds by default, as the spec promises, and not a moment longer', async () => {
+    vi.useFakeTimers();
+    expect(PROVIDER_TIMEOUT_MS).toBe(30_000);
+    const { fetchFn } = aFetch(() => new Promise<Response>(() => {}));
+    const slow = createOpenAiCompatibleClient({
+      id: 'groq',
+      label: 'Groq',
+      baseUrl: 'https://api.example.test/v1',
+      apiKey: SECRET,
+      model: 'm',
+      fetch: fetchFn,
+    });
+    let outcome: unknown = 'pending';
+    slow.complete(request).catch((error) => (outcome = error));
+
+    await vi.advanceTimersByTimeAsync(29_999);
+    expect(outcome).toBe('pending');
+    await vi.advanceTimersByTimeAsync(2);
+
+    expect(outcome).toMatchObject({ kind: 'unavailable' });
+  });
+
+  it('cancels the request itself when the time is up, so it does not keep running', async () => {
+    vi.useFakeTimers();
+    let signal: AbortSignal | undefined;
+    const fetchFn = ((_url: unknown, init?: RequestInit) => {
+      signal = init?.signal ?? undefined;
+      return new Promise<Response>(() => {});
+    }) as typeof fetch;
+    const slow = createOpenAiCompatibleClient({
+      id: 'groq',
+      label: 'Groq',
+      baseUrl: 'https://api.example.test/v1',
+      model: 'm',
+      fetch: fetchFn,
+      timeoutMs: 100,
+    });
+    slow.complete(request).catch(() => {});
+
+    await vi.advanceTimersByTimeAsync(101);
+
+    expect(signal?.aborted).toBe(true);
+  });
+
+  it('leaves no timer running after a call that succeeds', async () => {
+    vi.useFakeTimers();
+    const { fetchFn } = aFetch(() => answer('Hello'));
+
+    await client(fetchFn).complete(request);
+
+    expect(vi.getTimerCount()).toBe(0);
+  });
+});
+
+describe('createOpenAiCompatibleClient: replies in unusual shapes', () => {
+  it('accepts tool arguments sent as an object, as some local servers do, and passes them on as text', async () => {
+    const { fetchFn } = aFetch(() =>
+      Response.json({
+        choices: [
+          {
+            message: {
+              content: null,
+              tool_calls: [
+                { id: 'c1', function: { name: 'get_breakdown', arguments: { groupBy: 'level' } } },
+              ],
+            },
+          },
+        ],
+      }),
+    );
+
+    const reply = await client(fetchFn).complete(request);
+
+    expect(reply.toolCalls[0]!.arguments).toBe('{"groupBy":"level"}');
+  });
+
+  it('treats an answer of only spaces as empty', async () => {
+    const { fetchFn } = aFetch(() => answer('   \n  '));
+
+    const error = await failureOf(client(fetchFn).complete(request));
+
+    expect(error.kind).toBe('unavailable');
+  });
+
+  it('trims the spaces around a real answer', async () => {
+    const { fetchFn } = aFetch(() => answer('  Hello  \n'));
+
+    expect((await client(fetchFn).complete(request)).content).toBe('Hello');
+  });
+
+  it('skips a tool call that has no name instead of failing the whole reply', async () => {
+    const { fetchFn } = aFetch(() =>
+      Response.json({
+        choices: [
+          { message: { content: 'Hi', tool_calls: [{ id: 'c1', function: { arguments: '{}' } }] } },
+        ],
+      }),
+    );
+
+    expect(await client(fetchFn).complete(request)).toEqual({ content: 'Hi', toolCalls: [] });
   });
 });

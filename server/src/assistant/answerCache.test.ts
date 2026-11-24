@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createAnswerCache, normalizeQuestion } from './answerCache.ts';
+import { CACHE_MAX_ENTRIES, CACHE_TTL_SECONDS } from './buildAssistant.ts';
 
 function aClock() {
   let now = new Date('2026-11-24T10:00:00Z').getTime();
@@ -71,5 +72,35 @@ describe('createAnswerCache', () => {
 
     expect(cache.size()).toBe(1);
     expect(cache.get('one', 1, 'auto')).toEqual({ answer: '1 again' });
+  });
+
+  it('treats a question stored again as the newest, so it is not the next one dropped', () => {
+    const cache = createAnswerCache({ maxEntries: 2, ttlSeconds: 3600, clock: aClock().now });
+    cache.set('a', 1, 'auto', { answer: 'a' });
+    cache.set('b', 1, 'auto', { answer: 'b' });
+    cache.set('a', 1, 'auto', { answer: 'a again' });
+
+    cache.set('c', 1, 'auto', { answer: 'c' });
+
+    expect(cache.get('a', 1, 'auto')).toEqual({ answer: 'a again' });
+    expect(cache.get('b', 1, 'auto')).toBeUndefined();
+  });
+
+  it('keeps an answer for the whole of its lifetime and not a second more', () => {
+    const clock = aClock();
+    const cache = createAnswerCache({ maxEntries: 10, ttlSeconds: 60, clock: clock.now });
+    cache.set('q', 1, 'auto', { answer: 'A' });
+
+    clock.advance(59);
+    expect(cache.get('q', 1, 'auto')).toEqual({ answer: 'A' });
+    clock.advance(1);
+    expect(cache.get('q', 1, 'auto')).toBeUndefined();
+  });
+});
+
+describe('the cache the assistant is built with', () => {
+  it('holds at most 100 answers, for at most an hour, as the spec promises', () => {
+    expect(CACHE_MAX_ENTRIES).toBe(100);
+    expect(CACHE_TTL_SECONDS).toBe(3600);
   });
 });
