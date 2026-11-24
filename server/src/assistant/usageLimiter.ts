@@ -9,8 +9,19 @@ export interface UsageLimiterOptions {
   clock: () => Date;
 }
 
+/**
+ * Proof of which hour and which day a question was charged to. Giving a question back needs it,
+ * so a late refund can never take a question from a later hour or day.
+ */
+export interface UsageTicket {
+  readonly visitorId: string;
+  readonly windowStart: number;
+  readonly dayKey: string;
+  refunded: boolean;
+}
+
 export type UsageDecision =
-  | { allowed: true; remainingThisHour: number }
+  | { allowed: true; remainingThisHour: number; ticket: UsageTicket }
   | {
       allowed: false;
       /** visitor: this person used their hour. daily: everyone used the day. busy: too many people at once. */
@@ -81,7 +92,11 @@ export function createUsageLimiter({
       }
       entry.count += 1;
       day.count += 1;
-      return { allowed: true, remainingThisHour: perVisitorPerHour - entry.count };
+      return {
+        allowed: true,
+        remainingThisHour: perVisitorPerHour - entry.count,
+        ticket: { visitorId, windowStart: entry.windowStart, dayKey: day.key, refunded: false },
+      };
     },
 
     /** How many questions a visitor can still ask this hour. Does not use one. */
@@ -91,11 +106,22 @@ export function createUsageLimiter({
       return Math.max(0, perVisitorPerHour - entry.count);
     },
 
-    /** Gives back a question that could not be answered, for example because every provider was down. */
-    refund(visitorId: string): void {
-      const entry = visitors.get(visitorId);
-      if (entry && entry.count > 0) entry.count -= 1;
-      if (day.key === clock().toISOString().slice(0, 10) && day.count > 0) day.count -= 1;
+    /**
+     * Gives back a question that could not be answered, for example because every provider was
+     * down. Only the hour and the day the question was charged to are touched, and a ticket
+     * can be given back once.
+     */
+    refund(ticket: UsageTicket): void {
+      if (ticket.refunded) return;
+      ticket.refunded = true;
+
+      const entry = visitors.get(ticket.visitorId);
+      if (entry && entry.windowStart === ticket.windowStart && entry.count > 0) {
+        entry.count -= 1;
+        // A visitor with no questions left to count takes no room in the table.
+        if (entry.count === 0) visitors.delete(ticket.visitorId);
+      }
+      if (day.key === ticket.dayKey && day.count > 0) day.count -= 1;
     },
 
     /** The limits this limiter enforces, so a caller can report them. */

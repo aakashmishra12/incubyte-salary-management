@@ -10,6 +10,7 @@ import {
   NoProviderAvailableError,
   UnknownProviderError,
 } from '../assistant/failover.ts';
+import { visitorKeyFor } from '../assistant/visitorKey.ts';
 import { HttpError } from '../http/errors.ts';
 
 const askSchema = z.object({
@@ -84,7 +85,7 @@ export function assistantRoutes(assistant: AssistantService | undefined): Router
           history,
           provider,
           // The address of whoever is asking. See "trust proxy" in app.ts.
-          visitorId: request.ip ?? 'unknown',
+          visitorId: visitorKeyFor(request.ip),
         }),
       );
     } catch (error) {

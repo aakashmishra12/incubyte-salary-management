@@ -179,7 +179,7 @@ export function createAssistantService(deps: AssistantDeps) {
         outcome = await converse(input);
       } catch (error) {
         // No provider could answer, so this question should not count against anyone.
-        limiter.refund(input.visitorId);
+        limiter.refund(decision.ticket);
         throw error;
       }
 
