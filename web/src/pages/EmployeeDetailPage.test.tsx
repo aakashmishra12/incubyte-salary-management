@@ -240,6 +240,55 @@ describe('changing a salary', () => {
     expect(screen.getByText('Annual review')).toBeInTheDocument();
   });
 
+  it('sends the change once, however many times Save is pressed while it is being saved', async () => {
+    const updated = kenji({ salaryMinor: 110_000_00, salaryUsdMinor: 110_000_00 });
+    let release: (value: Response) => void = () => {};
+    const requests = openEmployee({
+      'POST /api/employees/7/salary-changes': () =>
+        new Promise<Response>((resolve) => (release = resolve)) as unknown as Response,
+    });
+    const dialog = await fillInChange({
+      salary: '110000',
+      date: '2026-11-01',
+      reason: 'Annual review',
+    });
+
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
+    expect(within(dialog).getByRole('button', { name: 'Save' })).toBeDisabled();
+    // A fast second click and the Enter key both arrive while the first save is still running.
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
+    fireEvent.submit(within(dialog).getByLabelText('Reason').closest('form')!);
+    release(Response.json(updated));
+
+    await vi.waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(requests.filter((request) => request.method === 'POST')).toHaveLength(1);
+  });
+
+  it('marks the lists and insights as out of date after a change, so they show the new salary when next opened', async () => {
+    openEmployee({
+      'POST /api/employees/7/salary-changes': () =>
+        kenji({ salaryMinor: 110_000_00, salaryUsdMinor: 110_000_00 }),
+    });
+    queryClient.setQueryData(['employees', 'country=IN'], {
+      items: [],
+      total: 0,
+      page: 1,
+      pageSize: 25,
+    });
+    queryClient.setQueryData(['insights', 'overview'], { headcount: 1 });
+    const dialog = await fillInChange({
+      salary: '110000',
+      date: '2026-11-01',
+      reason: 'Annual review',
+    });
+
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
+    await vi.waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+
+    expect(queryClient.getQueryState(['employees', 'country=IN'])?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(['insights', 'overview'])?.isInvalidated).toBe(true);
+  });
+
   it('shows the reason and keeps what I typed when the server refuses the change', async () => {
     openEmployee({
       'POST /api/employees/7/salary-changes': () =>

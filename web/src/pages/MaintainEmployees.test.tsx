@@ -85,6 +85,31 @@ describe('adding an employee', () => {
     });
   });
 
+  it('sends a new employee once, however many times the button is pressed', async () => {
+    let release: (value: Response) => void = () => {};
+    const requests = stubApi({
+      'GET /api/reference': () => reference,
+      'POST /api/employees': () =>
+        new Promise<Response>((resolve) => (release = resolve)) as unknown as Response,
+      'GET /api/employees/7': () => detailOf({ id: 7, firstName: 'Mei', lastName: 'Tanaka' }),
+    });
+    renderPage(<App />, { route: '/employees/new' });
+    await fillInNewEmployee();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Add employee' }));
+    expect(screen.getByRole('button', { name: 'Add employee' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Add employee' }));
+    fireEvent.submit(screen.getByLabelText(/^First name/).closest('form')!);
+    release(
+      new Response(JSON.stringify(detailOf({ id: 7, firstName: 'Mei', lastName: 'Tanaka' })), {
+        status: 201,
+      }),
+    );
+
+    await screen.findByRole('heading', { name: 'Mei Tanaka' });
+    expect(requests.filter((request) => request.method === 'POST')).toHaveLength(1);
+  });
+
   it('shows which field the server refused and keeps what I typed', async () => {
     stubApi({
       'GET /api/reference': () => reference,
@@ -181,6 +206,53 @@ describe('editing an employee', () => {
 
     await vi.waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     expect(requests.find((request) => request.method === 'PATCH')?.body).toEqual({ level: 'L3' });
+  });
+});
+
+describe('pressing Enter while a save is already running', () => {
+  it('does not edit the employee twice', async () => {
+    let release: (value: Response) => void = () => {};
+    const requests = stubApi({
+      'GET /api/reference': () => reference,
+      'GET /api/employees/7': () => detailOf({ level: 'L2' }),
+      'PATCH /api/employees/7': () =>
+        new Promise<Response>((resolve) => (release = resolve)) as unknown as Response,
+    });
+    renderPage(<App />, { route: '/employees/7' });
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit details' }));
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.clear(within(dialog).getByLabelText('Job title'));
+    await userEvent.type(within(dialog).getByLabelText('Job title'), 'Staff Engineer');
+
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
+    fireEvent.submit(within(dialog).getByLabelText('Job title').closest('form')!);
+    release(Response.json(detailOf({ level: 'L2', jobTitle: 'Staff Engineer' })));
+
+    await vi.waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(requests.filter((request) => request.method === 'PATCH')).toHaveLength(1);
+  });
+
+  it('does not mark the employee as left twice', async () => {
+    let release: (value: Response) => void = () => {};
+    const requests = stubApi({
+      'GET /api/reference': () => reference,
+      'GET /api/employees/7': () => detailOf(),
+      'POST /api/employees/7/leave': () =>
+        new Promise<Response>((resolve) => (release = resolve)) as unknown as Response,
+    });
+    renderPage(<App />, { route: '/employees/7' });
+    await userEvent.click(await screen.findByRole('button', { name: 'Mark as left' }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.change(within(dialog).getByLabelText('Leaving date'), {
+      target: { value: '2026-11-15' },
+    });
+
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Mark as left' }));
+    fireEvent.submit(within(dialog).getByLabelText('Leaving date').closest('form')!);
+    release(Response.json(detailOf({ status: 'left', leftOn: '2026-11-15' })));
+
+    await vi.waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(requests.filter((request) => request.url.pathname.endsWith('/leave'))).toHaveLength(1);
   });
 });
 
