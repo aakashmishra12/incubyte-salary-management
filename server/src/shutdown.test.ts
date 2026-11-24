@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process';
 import { mkdtempSync } from 'node:fs';
+import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -39,12 +40,25 @@ function startServer(port: number) {
   return { child, ready, exited, output: () => output };
 }
 
+/** Asks the system for a port nobody is using, so the tests cannot collide with anything else running. */
+function freePort(): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const probe = createServer();
+    probe.once('error', reject);
+    probe.listen(0, '127.0.0.1', () => {
+      const { port } = probe.address() as { port: number };
+      probe.close(() => resolve(port));
+    });
+  });
+}
+
 describe('the server process', () => {
   it('starts on the port in PORT, seeds an empty database, and answers', async () => {
-    const server = startServer(4871);
+    const port = await freePort();
+    const server = startServer(port);
     await server.ready;
 
-    const response = await fetch('http://127.0.0.1:4871/api/employees?pageSize=1');
+    const response = await fetch(`http://127.0.0.1:${port}/api/employees?pageSize=1`);
     const body = (await response.json()) as { total: number };
     server.child.kill('SIGTERM');
     await server.exited;
@@ -54,7 +68,7 @@ describe('the server process', () => {
   }, 30_000);
 
   it('stops cleanly when asked to stop, instead of being killed', async () => {
-    const server = startServer(4872);
+    const server = startServer(await freePort());
     await server.ready;
 
     server.child.kill('SIGTERM');
