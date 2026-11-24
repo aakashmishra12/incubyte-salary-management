@@ -9,7 +9,7 @@ A web app for the HR Manager of ACME, a company with 10,000 employees in eight c
 Built as a take-home assessment for Incubyte.
 
 - **Live app:** http://46.202.162.232:8787 (plain HTTP on a VPS, generated data)
-- **Video demo:** [docs/demo/demo.mp4](docs/demo/demo.mp4) (about 2 minutes, captioned)
+- **Video demo:** [docs/demo/demo.mp4](docs/demo/demo.mp4) (about 3 minutes, narrated)
 
 ## Where to start reading
 | Document | What it is |
