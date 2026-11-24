@@ -5,7 +5,7 @@ Tool: Claude Code (Anthropic) in VS Code. The standing instructions I gave it ar
 ## Ground rules I set
 - Work stage by stage. The AI explains the plan in plain words and waits for my go-ahead.
 - Requirements and a spec come before code. Tests come before the code that passes them.
-- The AI wrote the code slice by slice, test first, and I approved each stage and each decision. Before submission the finished code is reviewed file by file, and anything that cannot be explained is rewritten or removed.
+- The AI wrote the code slice by slice, test first, and I approved each stage and each decision. The finished code was then checked by an adversarial AI review with a skeptic vote per finding, by mutation checks, and by a clean-clone build (see REVIEW.md). That is not the same as me reading every file myself. I will go through the code with the interviewers and say plainly where I have not.
 - Never invent requirements. Unclear points are written down as explicit assumptions in `docs/ASSUMPTIONS.md`.
 
 ## Log

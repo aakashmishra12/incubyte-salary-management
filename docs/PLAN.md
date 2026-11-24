@@ -7,7 +7,7 @@ Written on 23 Nov 2026, after the requirements one-pager and before any code.
 2. **Red.** A failing test for the first criterion, committed as `test:`.
 3. **Green.** The smallest code that makes it pass, committed as `feat:` or `fix:`.
 4. **Refactor.** Clean up with the tests green, committed as `refactor:`.
-5. **Review.** Each slice is checked by running it, in the tests and in a real browser. The finished code is then reviewed file by file before submission, and anything that cannot be explained is rewritten or removed.
+5. **Review.** Each slice is checked by running it, in the tests and in a real browser. The finished code was then put through an adversarial AI review, mutation checks and a clean-clone build (see REVIEW.md). A person reading every file is a separate step that this plan does not claim to have finished.
 6. **Ship.** CI runs lint, type checks and tests on every push. The main branch is always deployable.
 
 ## Commit history
