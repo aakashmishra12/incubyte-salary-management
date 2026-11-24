@@ -4,10 +4,15 @@
  */
 import { mkdirSync, rmSync } from 'node:fs';
 import path from 'node:path';
-import { config } from '../config.ts';
+import { loadConfig } from '../config.ts';
 import { openDatabase } from '../db/database.ts';
+import { loadEnvFile } from '../loadEnv.ts';
 import { generateEmployees } from './generateEmployees.ts';
 import { DEFAULT_SEED, SEED_TIMESTAMP, seedDatabase } from './seedDatabase.ts';
+
+// The same settings as the server, so DATABASE_FILE in .env points both at the same file.
+loadEnvFile();
+const config = loadConfig(process.env);
 
 const startedAt = performance.now();
 

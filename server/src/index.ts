@@ -5,14 +5,16 @@ import { buildAssistant } from './assistant/buildAssistant.ts';
 import { loadAssistantConfig } from './assistant/config.ts';
 import { createFailover } from './assistant/failover.ts';
 import { createOpenAiCompatibleClient } from './assistant/providerClient.ts';
-import { config } from './config.ts';
+import { loadConfig } from './config.ts';
 import { openDatabase } from './db/database.ts';
+import { loadEnvFile } from './loadEnv.ts';
 import { DEFAULT_SEED, SEED_TIMESTAMP, seedIfEmpty } from './seed/seedDatabase.ts';
 
-// Settings such as provider keys live in a .env file at the project root, which git ignores.
-// Variables already set in the environment win over the file.
-const envFile = path.join(import.meta.dirname, '../../.env');
-if (existsSync(envFile)) process.loadEnvFile(envFile);
+// Settings such as the port and provider keys live in a .env file at the project root, which git
+// ignores. Variables already set in the environment win over the file. This must run before the
+// settings are read.
+loadEnvFile();
+const config = loadConfig(process.env);
 
 mkdirSync(path.dirname(config.databaseFile), { recursive: true });
 const db = openDatabase(config.databaseFile);
@@ -44,18 +46,13 @@ const assistant =
       })
     : undefined;
 
-// How many web servers sit in front of this one (for example 1 for Apache). Leave it unset
-// when the app is reached directly, so nobody can claim to be a different visitor.
-const trustProxy = Number(process.env.TRUST_PROXY);
-
-const server = createApp({
-  db,
-  webDir,
-  assistant,
-  trustProxy: Number.isInteger(trustProxy) && trustProxy > 0 ? trustProxy : undefined,
-}).listen(config.port, () => {
-  console.log(`Salary Management listening on http://localhost:${config.port}`);
-});
+const server = createApp({ db, webDir, assistant, trustProxy: config.trustProxy }).listen(
+  config.port,
+  config.host,
+  () => {
+    console.log(`Salary Management listening on http://${config.host}:${config.port}`);
+  },
+);
 
 // When the process is asked to stop (Ctrl+C, or the host restarting it), stop taking
 // requests, let the ones in progress finish, and close the database file cleanly.
