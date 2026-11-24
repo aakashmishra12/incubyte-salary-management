@@ -9,11 +9,13 @@ export function renderPage(page: ReactElement, { route = '/' }: { route?: string
   // A new cache per test, and no retries, so a failing request fails the test at once.
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
-  return render(
+  const result = render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={[route]}>{page}</MemoryRouter>
     </QueryClientProvider>,
   );
+  // The cache is returned so a test can make a page fetch its data again, as a window refocus does.
+  return { ...result, queryClient };
 }
 
 type Handler = (url: URL, init?: RequestInit) => unknown;
