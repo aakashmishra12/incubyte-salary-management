@@ -53,7 +53,8 @@ export function EditDetailsDialog({
 
   function save(event: FormEvent) {
     event.preventDefault();
-    if (!hasChanges) return;
+    // The button is disabled while saving, but Enter in a field still submits the form.
+    if (!hasChanges || update.isPending) return;
     update.mutate(changes, { onSuccess: onClose });
   }
 

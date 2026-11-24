@@ -56,6 +56,8 @@ export function NewEmployeePage() {
 
   function submit(event: FormEvent) {
     event.preventDefault();
+    // The button is disabled while saving, but Enter in a field still submits the form.
+    if (create.isPending) return;
 
     // Checked here only to save a round trip. The server checks everything again.
     const errors: Partial<Record<Field, string>> = {};

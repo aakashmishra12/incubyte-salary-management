@@ -29,7 +29,8 @@ export function MarkAsLeftDialog({
 
   function save(event: FormEvent) {
     event.preventDefault();
-    if (leftOn === '') return;
+    // The button is disabled while saving, but Enter in the field still submits the form.
+    if (leftOn === '' || markLeft.isPending) return;
     markLeft.mutate(leftOn, { onSuccess: onClose });
   }
 
