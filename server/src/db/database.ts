@@ -1,4 +1,5 @@
 import Database from 'better-sqlite3';
+import { foldText } from './fold.ts';
 import { migrate } from './migrations.ts';
 
 export type Db = Database.Database;
@@ -13,6 +14,11 @@ export function openDatabase(file: string): Db {
   db.pragma('foreign_keys = ON');
   // Write-ahead logging lets reads continue while a write is in progress.
   db.pragma('journal_mode = WAL');
+
+  // Lets SQL compare text without caring about capitals or accents: fold(name) LIKE '%jose%'.
+  db.function('fold', { deterministic: true }, (value) =>
+    typeof value === 'string' ? foldText(value) : value,
+  );
 
   migrate(db);
   return db;

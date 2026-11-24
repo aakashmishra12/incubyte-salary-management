@@ -1,4 +1,5 @@
 import type { Db } from '../db/database.ts';
+import { foldText } from '../db/fold.ts';
 import type { Employee, EmployeeDraft, EmployeeStatus } from '../domain/employee.ts';
 import type { PayRow } from '../domain/insights.ts';
 import { toUsdMinor } from '../domain/money.ts';
@@ -343,9 +344,11 @@ function buildFilter(query: EmployeeListQuery): {
   }
   if (query.search) {
     // LIKE treats % and _ as wildcards. Put a backslash before them so they match literally.
-    const literal = query.search.replace(/[\\%_]/g, (character) => `\\${character}`);
+    // Names are folded, and so is the search text, so case and accents are ignored. Emails and
+    // employee codes are plain ASCII, where LIKE already ignores case, so they need no folding.
+    const literal = foldText(query.search).replace(/[\\%_]/g, (character) => `\\${character}`);
     conditions.push(`(
-      first_name || ' ' || last_name LIKE @search ESCAPE '\\'
+      fold(first_name || ' ' || last_name) LIKE @search ESCAPE '\\'
       OR email LIKE @search ESCAPE '\\'
       OR employee_code LIKE @search ESCAPE '\\'
     )`);

@@ -1,14 +1,15 @@
 /**
- * `npm run seed`: throws away the current database and builds a fresh one
- * with 10,000 employees. Safe to run as often as you like.
+ * `npm run seed`: replaces every employee in the database with 10,000 freshly generated ones.
+ * Safe to run as often as you like, and safe to run while the server is running: the database
+ * file is kept and the swap is one transaction, so the server never sees a half-empty database.
  */
-import { mkdirSync, rmSync } from 'node:fs';
+import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { loadConfig } from '../config.ts';
 import { openDatabase } from '../db/database.ts';
 import { loadEnvFile } from '../loadEnv.ts';
 import { generateEmployees } from './generateEmployees.ts';
-import { DEFAULT_SEED, SEED_TIMESTAMP, seedDatabase } from './seedDatabase.ts';
+import { DEFAULT_SEED, replaceAllEmployees, SEED_TIMESTAMP } from './seedDatabase.ts';
 
 // The same settings as the server, so DATABASE_FILE in .env points both at the same file.
 loadEnvFile();
@@ -16,14 +17,9 @@ const config = loadConfig(process.env);
 
 const startedAt = performance.now();
 
-// SQLite keeps two helper files next to the database in WAL mode. Remove all three.
-for (const suffix of ['', '-wal', '-shm']) {
-  rmSync(config.databaseFile + suffix, { force: true });
-}
 mkdirSync(path.dirname(config.databaseFile), { recursive: true });
-
 const db = openDatabase(config.databaseFile);
-seedDatabase(db, generateEmployees(DEFAULT_SEED), SEED_TIMESTAMP);
+replaceAllEmployees(db, generateEmployees(DEFAULT_SEED), SEED_TIMESTAMP);
 db.close();
 
 const seconds = ((performance.now() - startedAt) / 1000).toFixed(2);
