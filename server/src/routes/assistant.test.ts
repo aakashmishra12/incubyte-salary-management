@@ -59,7 +59,12 @@ describe('GET /api/assistant/status', () => {
 
     const response = await request(createApp({ db })).get('/api/assistant/status');
 
-    expect(response.body).toEqual({ enabled: false, providers: [], limits: null });
+    expect(response.body).toEqual({
+      enabled: false,
+      providers: [],
+      limits: null,
+      remainingThisHour: 0,
+    });
   });
 
   it('lists the providers and their state, and never anything about keys', async () => {
@@ -71,6 +76,7 @@ describe('GET /api/assistant/status', () => {
       enabled: true,
       providers: [{ id: 'groq', label: 'Groq', state: 'ready' }],
       limits: { perVisitorPerHour: 20 },
+      remainingThisHour: 20,
     });
   });
 });
@@ -90,6 +96,7 @@ describe('POST /api/assistant/ask', () => {
       providerLabel: 'Groq',
       cached: false,
       remainingThisHour: 19,
+      unverifiedFigures: [],
     });
     const toolMessage = failover.requests[1]!.messages.at(-1) as { content: string };
     expect(JSON.parse(toolMessage.content).activeEmployees).toBe(2);
@@ -141,6 +148,40 @@ describe('POST /api/assistant/ask', () => {
 
     expect(response.status).toBe(400);
     expect(response.body.issues.map((i: { field: string }) => i.field)).toContain(field);
+  });
+
+  it('tells the browser how many questions are left, so the count survives a reload', async () => {
+    const { app } = setup(aFailover(said('Hi')));
+
+    await ask(app, { question: 'First question' });
+    const status = await request(app).get('/api/assistant/status');
+
+    expect(status.body.remainingThisHour).toBe(19);
+  });
+
+  it('accepts a follow-up after a long answer, because earlier messages may be as long as an answer can be', async () => {
+    const { app } = setup(aFailover(said('Fine')));
+
+    const response = await ask(app, {
+      question: 'And in India?',
+      history: [
+        { role: 'user', content: 'Costs?' },
+        { role: 'assistant', content: 'x'.repeat(7_000) },
+      ],
+    });
+
+    expect(response.status).toBe(200);
+  });
+
+  it('refuses an earlier message longer than 8,000 characters', async () => {
+    const { app } = setup(aFailover(said('Fine')));
+
+    const response = await ask(app, {
+      question: 'And in India?',
+      history: [{ role: 'assistant', content: 'x'.repeat(8_001) }],
+    });
+
+    expect(response.status).toBe(400);
   });
 
   it('refuses a question over the hourly limit with a 429, the wait, and a Retry-After header', async () => {

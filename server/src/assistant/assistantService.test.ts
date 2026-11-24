@@ -101,6 +101,7 @@ describe('answering a question', () => {
       providerLabel: 'Groq',
       cached: false,
       remainingThisHour: 19,
+      unverifiedFigures: [],
     });
   });
 
@@ -238,14 +239,16 @@ describe('a conversation', () => {
 });
 
 describe('the limits on one question', () => {
-  it('stops after four rounds of tool calls and says so, without a fifth call', async () => {
+  it('stops after four model calls and says so, without running tools whose results nobody would read', async () => {
     const failover = aFailover(calling({}));
-    const { ask } = setup(failover);
+    const { ask, tools } = setup(failover);
 
     const result = await ask('Q');
 
     expect(failover.requests).toHaveLength(4);
     expect(result.answer).toContain('could not answer');
+    // Three rounds of tools were read by the model. A fourth would only be wasted work.
+    expect(tools.asked).toHaveLength(3);
   });
 
   it('runs at most four tool calls in one round, and still answers every call', async () => {
@@ -261,6 +264,91 @@ describe('the limits on one question', () => {
     expect(toolMessages[5]).toMatchObject({
       content: expect.stringContaining('Too many tool calls'),
     });
+  });
+});
+
+describe('checking the figures in an answer', () => {
+  const NOTE = 'Check these figures against the sources';
+
+  it('leaves an answer alone when every figure came from a tool', async () => {
+    const { ask } = setup(aFailover(calling({}), said('We have 9,598 active employees.')));
+
+    const result = await ask('How many people?');
+
+    expect(result.answer).toBe('We have 9,598 active employees.');
+    expect(result.unverifiedFigures).toEqual([]);
+  });
+
+  it('warns about a figure that is in no tool result, and names it', async () => {
+    const { ask } = setup(aFailover(calling({}), said('We have about 9,600 active employees.')));
+
+    const result = await ask('How many people?');
+
+    expect(result.unverifiedFigures).toEqual(['9600']);
+    expect(result.answer).toContain('We have about 9,600 active employees.');
+    expect(result.answer).toContain(`${NOTE}: 9600`);
+  });
+
+  it('says plainly that nothing was looked up when a figure comes with no tool call at all', async () => {
+    const { ask } = setup(aFailover(said('The average salary is USD 1,000,000.')));
+
+    const result = await ask('What is the average salary?');
+
+    expect(result.unverifiedFigures).toEqual(['1000000']);
+    expect(result.answer).toContain('No company data was looked up for this answer');
+  });
+
+  it('does not remember an answer with an unchecked figure', async () => {
+    const failover = aFailover(
+      said('The average is USD 1,000,000.'),
+      said('The average is USD 1,000,000.'),
+    );
+    const { ask } = setup(failover);
+    await ask('What is the average salary?');
+
+    expect((await ask('What is the average salary?')).cached).toBe(false);
+    expect(failover.requests).toHaveLength(2);
+  });
+
+  it('is happy with an answer that has no figures and no tool call, and remembers it', async () => {
+    const failover = aFailover(said('I can only help with pay and people questions.'));
+    const { ask } = setup(failover);
+    await ask('Tell me a joke');
+
+    expect((await ask('Tell me a joke')).cached).toBe(true);
+  });
+
+  it('accepts a figure that the visitor typed in their own question', async () => {
+    const { ask } = setup(aFailover(said('Nobody earns 85,000 in that group.')));
+
+    const result = await ask('Does anyone earn 85,000?');
+
+    expect(result.unverifiedFigures).toEqual([]);
+  });
+});
+
+describe('a long conversation', () => {
+  it('shortens each earlier message, so a long answer does not swamp the next question', async () => {
+    const failover = aFailover(said('Hi'));
+    const long = 'word '.repeat(1_000);
+
+    await setup(failover).ask('Next?', { history: [{ role: 'assistant', content: long }] });
+
+    const sent = failover.requests[0]!.request.messages[1] as { content: string };
+    expect(sent.content.length).toBeLessThanOrEqual(1_501);
+    expect(sent.content.endsWith('…')).toBe(true);
+  });
+
+  it('keeps a short earlier message exactly as it was', async () => {
+    const failover = aFailover(said('Hi'));
+
+    await setup(failover).ask('Next?', {
+      history: [{ role: 'user', content: 'Earlier question' }],
+    });
+
+    expect((failover.requests[0]!.request.messages[1] as { content: string }).content).toBe(
+      'Earlier question',
+    );
   });
 });
 
@@ -355,13 +443,19 @@ describe('when the assistant is not set up', () => {
     expect(service.status().enabled).toBe(false);
   });
 
-  it('reports each provider and the limits when it is on', () => {
-    const { service } = setup(aFailover(said('Hi')));
+  it('reports each provider, the limits, and how many questions this visitor has left', async () => {
+    const { service, ask } = setup(aFailover(said('Hi')));
 
-    expect(service.status()).toEqual({
+    expect(service.status('visitor-1')).toEqual({
       enabled: true,
       providers: [{ id: 'groq', label: 'Groq', state: 'ready' }],
       limits: { perVisitorPerHour: 20 },
+      remainingThisHour: 20,
     });
+
+    await ask('A question');
+
+    expect(service.status('visitor-1').remainingThisHour).toBe(19);
+    expect(service.status('someone-else').remainingThisHour).toBe(20);
   });
 });
