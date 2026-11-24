@@ -67,7 +67,7 @@ npm start
 | Setting | Default | Meaning |
 |---|---|---|
 | `PORT` | `3000` | The port the server listens on. |
-| `DATABASE_FILE` | `server/data/salary.sqlite` | Where the SQLite file is kept. |
+| `DATABASE_FILE` | `server/data/salary.sqlite` | Where the SQLite file is kept. Use an absolute path if you set it. |
 | `GROQ_API_KEY`, `GEMINI_API_KEY`, `OPENROUTER_API_KEY`, `NVIDIA_API_KEY` | none | Turn the pay assistant on. See `.env.example` for every setting. |
 | `TRUST_PROXY` | unset | `1` when the app sits behind one web server. |
 
