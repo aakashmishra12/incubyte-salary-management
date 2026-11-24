@@ -25,6 +25,28 @@ describe('toUsdMinor', () => {
   });
 });
 
+describe('toUsdMinor at exact halves', () => {
+  // Each of these is exactly half a cent over, so it must round up. With ordinary decimal
+  // arithmetic they come out one cent low, for example 425.00 * 0.0118 = 5.015 is held as 5.01499.
+  it.each([
+    ['INR', 42_500, 502],
+    ['INR', 137_500, 1_623],
+    ['SGD', 4_350, 3_350],
+    ['SGD', 9_950, 7_662],
+  ] as const)('rounds %s %i up to %i cents', (currency, amountMinor, expected) => {
+    expect(toUsdMinor(amountMinor, currency)).toBe(expected);
+  });
+
+  it('still converts a very large salary without losing a cent', () => {
+    // 90 billion yen is far above any salary, and above the size where plain numbers stay exact.
+    expect(toUsdMinor(90_000_000_000, 'JPY')).toBe(60_300_000_000_00);
+  });
+
+  it('gives zero for zero', () => {
+    expect(toUsdMinor(0, 'GBP')).toBe(0);
+  });
+});
+
 describe('toMinorUnits', () => {
   it('turns dollars into cents', () => {
     expect(toMinorUnits(85_000, 'USD')).toBe(85_000_00);

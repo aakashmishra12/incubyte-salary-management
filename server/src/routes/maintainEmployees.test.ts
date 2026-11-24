@@ -270,6 +270,37 @@ describe('POST /api/employees/:id/leave', () => {
     expect(response.body).toEqual({ error: message });
   });
 
+  it('refuses a leaving date before their most recent salary change', async () => {
+    const { app, db, ids } = setup([anEmployee({ hireDate: '2020-01-15' })]);
+    db.prepare(
+      `INSERT INTO salary_changes (employee_id, previous_minor, new_minor, currency, effective_date, reason, created_at)
+       VALUES (?, NULL, 100000, 'USD', '2026-06-01', 'Raise', ?)`,
+    ).run(ids[0], TEST_NOW);
+
+    const response = await request(app)
+      .post(`/api/employees/${ids[0]}/leave`)
+      .send({ leftOn: '2026-05-31' });
+
+    expect(response.status).toBe(422);
+    expect(response.body).toEqual({
+      error: 'The leaving date cannot be before the most recent salary change (2026-06-01).',
+    });
+  });
+
+  it('accepts a leaving date on the day of their most recent salary change', async () => {
+    const { app, db, ids } = setup([anEmployee({ hireDate: '2020-01-15' })]);
+    db.prepare(
+      `INSERT INTO salary_changes (employee_id, previous_minor, new_minor, currency, effective_date, reason, created_at)
+       VALUES (?, NULL, 100000, 'USD', '2026-06-01', 'Raise', ?)`,
+    ).run(ids[0], TEST_NOW);
+
+    const response = await request(app)
+      .post(`/api/employees/${ids[0]}/leave`)
+      .send({ leftOn: '2026-06-01' });
+
+    expect(response.status).toBe(200);
+  });
+
   it('refuses someone who has already left', async () => {
     const { app, ids } = setup([anEmployee({ status: 'left', leftOn: '2025-06-30' })]);
 

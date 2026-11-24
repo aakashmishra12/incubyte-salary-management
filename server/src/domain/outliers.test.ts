@@ -89,4 +89,31 @@ describe('findOutliers', () => {
 
     expect(flagged).toEqual([1, 5]);
   });
+
+  describe('the compa-ratio shown for a flagged employee', () => {
+    it('never reads as exactly on the boundary when the person is just outside it', () => {
+      // 7,996 is 79.96% of 10,000: flagged as below, but rounding to two places gives 0.80.
+      const below = findOutliers(peers([7_996, 10_000, 10_000, 10_000, 10_000]));
+      // 12,004 is 120.04% of 10,000: flagged as above, but rounding gives 1.20.
+      const above = findOutliers(peers([10_000, 10_000, 10_000, 10_000, 12_004]));
+
+      expect(below[0]).toMatchObject({ direction: 'below', compaRatio: 0.79 });
+      expect(above[0]).toMatchObject({ direction: 'above', compaRatio: 1.21 });
+    });
+
+    it('is rounded to two places otherwise', () => {
+      // 16,667 against a median of 10,000 is 1.6667, shown as 1.67.
+      const [outlier] = findOutliers(peers([10_000, 10_000, 10_000, 10_000, 16_667]));
+
+      expect(outlier).toMatchObject({ compaRatio: 1.67, peerMedianMinor: 10_000, peerCount: 5 });
+    });
+
+    it('reports the number of peers, counting the person flagged', () => {
+      const [outlier] = findOutliers(
+        peers([10_000, 10_000, 10_000, 10_000, 10_000, 10_000, 30_000]),
+      );
+
+      expect(outlier!.peerCount).toBe(7);
+    });
+  });
 });
