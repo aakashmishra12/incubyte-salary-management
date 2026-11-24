@@ -53,6 +53,43 @@ describe('parseMoney', () => {
   );
 });
 
+describe('parseMoney: amounts that look right but are not', () => {
+  it.each([
+    '1,5',
+    '1,50',
+    '85,000,5',
+    '12,34,567',
+    '1,2345',
+    ',500',
+    '1,,000',
+    '85.000,50',
+    '.5',
+    '5.',
+  ])(
+    'refuses %j, because a comma that is not grouping thousands could be a decimal comma',
+    (text) => {
+      expect(parseMoney(text, 'USD')).toBeNull();
+    },
+  );
+
+  it('accepts thousands grouped in threes, with or without a decimal part', () => {
+    expect(parseMoney('1,234,567', 'USD')).toBe(1_234_567_00);
+    expect(parseMoney('1,234.50', 'USD')).toBe(1_234_50);
+  });
+
+  it('refuses more decimals than the currency has: no fractions of a yen, no third decimal for dollars', () => {
+    expect(parseMoney('9500000.5', 'JPY')).toBeNull();
+    expect(parseMoney('9500000.0', 'JPY')).toBeNull();
+    expect(parseMoney('85000.505', 'USD')).toBeNull();
+    expect(parseMoney('85000.5', 'USD')).toBe(85_000_50);
+  });
+
+  it('refuses an amount above what the server would accept, so the person is told before they save', () => {
+    expect(parseMoney('10,000,000,000', 'USD')).toBe(1_000_000_000_000);
+    expect(parseMoney('10,000,000,001', 'USD')).toBeNull();
+  });
+});
+
 describe('percentChange', () => {
   it('shows a rise with a plus sign', () => {
     expect(percentChange(100_000_00, 110_000_00)).toBe('+10.0%');
