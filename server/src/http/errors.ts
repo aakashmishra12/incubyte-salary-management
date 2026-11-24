@@ -56,6 +56,19 @@ export function createErrorHandler(logError: (error: unknown) => void): ErrorReq
       return;
     }
 
+    // Express and its body reader attach a 4xx status to errors that are the caller's mistake:
+    // a body over the size limit (413), a badly encoded address (400), and so on. Answer them
+    // plainly. They are not bugs, so they are not logged.
+    const status = (error as { status?: unknown } | null)?.status;
+    if (typeof status === 'number' && status >= 400 && status < 500) {
+      const messages: Record<number, string> = {
+        400: 'The request could not be read',
+        413: 'The request is too large',
+      };
+      response.status(status).json({ error: messages[status] ?? 'The request was refused' });
+      return;
+    }
+
     // Unexpected: keep the details for the log and tell the caller nothing internal.
     logError(error);
     response.status(500).json({ error: 'Something went wrong' });
