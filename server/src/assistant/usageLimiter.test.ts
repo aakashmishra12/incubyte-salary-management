@@ -16,9 +16,9 @@ describe('createUsageLimiter', () => {
   it('lets a visitor ask up to the hourly limit and says how many are left', () => {
     const limiter = createUsageLimiter({ ...limits, clock: aClock().now });
 
-    expect(limiter.tryUse('a')).toEqual({ allowed: true, remainingThisHour: 2 });
-    expect(limiter.tryUse('a')).toEqual({ allowed: true, remainingThisHour: 1 });
-    expect(limiter.tryUse('a')).toEqual({ allowed: true, remainingThisHour: 0 });
+    expect(limiter.tryUse('a')).toMatchObject({ allowed: true, remainingThisHour: 2 });
+    expect(limiter.tryUse('a')).toMatchObject({ allowed: true, remainingThisHour: 1 });
+    expect(limiter.tryUse('a')).toMatchObject({ allowed: true, remainingThisHour: 0 });
   });
 
   it('refuses the next question and says when the hour is over', () => {
@@ -41,7 +41,7 @@ describe('createUsageLimiter', () => {
 
     clock.advance(3600);
 
-    expect(limiter.tryUse('a')).toEqual({ allowed: true, remainingThisHour: 2 });
+    expect(limiter.tryUse('a')).toMatchObject({ allowed: true, remainingThisHour: 2 });
   });
 
   it('counts each visitor separately', () => {
@@ -83,7 +83,7 @@ describe('createUsageLimiter', () => {
     clock.advance(24 * 3600);
 
     // A new day: the refused questions above must not have been counted against 'a'.
-    expect(limiter.tryUse('a')).toEqual({ allowed: true, remainingThisHour: 2 });
+    expect(limiter.tryUse('a')).toMatchObject({ allowed: true, remainingThisHour: 2 });
   });
 
   it('forgets visitors whose hour has passed, so memory does not grow without bound', () => {
@@ -117,6 +117,12 @@ describe('createUsageLimiter', () => {
   });
 
   describe('giving an allowance back and showing what is left', () => {
+    /** The ticket that a granted question comes with. It says which hour and which day were charged. */
+    function ticketOf(decision: ReturnType<ReturnType<typeof createUsageLimiter>['tryUse']>) {
+      if (!decision.allowed) throw new Error('Expected the question to be allowed');
+      return decision.ticket;
+    }
+
     it('shows how many questions a visitor has left, without using one', () => {
       const limiter = createUsageLimiter({ ...limits, clock: aClock().now });
       limiter.tryUse('a');
@@ -128,21 +134,60 @@ describe('createUsageLimiter', () => {
 
     it('gives a question back to the visitor and to the day', () => {
       const limiter = createUsageLimiter({ perVisitorPerHour: 3, perDay: 1, clock: aClock().now });
-      limiter.tryUse('a');
+      const ticket = ticketOf(limiter.tryUse('a'));
 
-      limiter.refund('a');
+      limiter.refund(ticket);
 
       expect(limiter.remaining('a')).toBe(3);
       expect(limiter.tryUse('b')).toMatchObject({ allowed: true });
     });
 
-    it('does nothing when there is nothing to give back', () => {
+    it('forgets a visitor completely when their only question is given back, so refusals cannot fill the table', () => {
+      const limiter = createUsageLimiter({ ...limits, maxVisitors: 2, clock: aClock().now });
+      const first = ticketOf(limiter.tryUse('a'));
+      const second = ticketOf(limiter.tryUse('b'));
+
+      limiter.refund(first);
+      limiter.refund(second);
+
+      expect(limiter.trackedVisitors()).toBe(0);
+      expect(limiter.tryUse('c')).toMatchObject({ allowed: true });
+    });
+
+    it('does not take a question from the new hour when the ticket is from an earlier one', () => {
+      const clock = aClock();
+      const limiter = createUsageLimiter({ ...limits, clock: clock.now });
+      const oldTicket = ticketOf(limiter.tryUse('a'));
+      clock.advance(3601);
+      limiter.tryUse('a');
+      limiter.tryUse('a');
+
+      limiter.refund(oldTicket);
+
+      expect(limiter.remaining('a')).toBe(1);
+    });
+
+    it('does not take a question from the new day when the ticket is from the day before', () => {
+      const clock = aClock('2026-11-24T23:59:00Z');
+      const limiter = createUsageLimiter({ perVisitorPerHour: 10, perDay: 1, clock: clock.now });
+      const oldTicket = ticketOf(limiter.tryUse('a'));
+      clock.advance(120);
+      limiter.tryUse('b');
+
+      limiter.refund(oldTicket);
+
+      expect(limiter.tryUse('c')).toMatchObject({ allowed: false, reason: 'daily' });
+    });
+
+    it('gives a ticket back only once', () => {
       const limiter = createUsageLimiter({ ...limits, clock: aClock().now });
+      const ticket = ticketOf(limiter.tryUse('a'));
+      limiter.tryUse('a');
 
-      limiter.refund('never-seen');
+      limiter.refund(ticket);
+      limiter.refund(ticket);
 
-      expect(limiter.remaining('never-seen')).toBe(3);
-      expect(limiter.tryUse('x')).toEqual({ allowed: true, remainingThisHour: 2 });
+      expect(limiter.remaining('a')).toBe(2);
     });
   });
 });
