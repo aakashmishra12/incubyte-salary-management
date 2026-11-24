@@ -1,5 +1,6 @@
 import type { AnswerCache } from './answerCache.ts';
 import type { ProviderStatus } from './failover.ts';
+import { findUngroundedFigures } from './grounding.ts';
 import type { ToolResult } from './tools.ts';
 import type { ChatMessage, ModelReply, ModelRequest, ProviderId, ToolDefinition } from './types.ts';
 import type { UsageLimiter } from './usageLimiter.ts';
@@ -7,10 +8,16 @@ import type { UsageLimiter } from './usageLimiter.ts';
 const MAX_TOOL_ROUNDS = 4;
 const MAX_TOOL_CALLS_PER_ROUND = 4;
 const HISTORY_MESSAGES = 6;
+// An earlier message is shortened to this, so a long answer does not swamp the next question or
+// use up a small token allowance. The answer itself is shown in full in the browser.
+const HISTORY_MESSAGE_CHARS = 1500;
 // Room for the answer and for any hidden thinking a model does first. Thinking counts against it.
 const MAX_ANSWER_TOKENS = 1500;
 
 const CUT_OFF = '\n\n(This answer was cut off because it was too long. Ask a narrower question.)';
+
+const unverifiedNote = (figures: string[], lookedUpData: boolean) =>
+  `\n\n(${lookedUpData ? '' : 'No company data was looked up for this answer. '}Check these figures against the sources: ${figures.join(', ')}. They were not found in the data this answer used.)`;
 
 const GAVE_UP =
   'I could not answer that within my limits. Try a narrower question, for example about one country or one department.';
@@ -42,6 +49,8 @@ export interface AssistantAnswer {
   providerLabel: string | null;
   cached: boolean;
   remainingThisHour: number;
+  /** Figures in the answer that were not in the data it used. Empty when every figure checks out. */
+  unverifiedFigures: string[];
 }
 
 export interface AssistantDeps {
@@ -71,7 +80,11 @@ export interface AskInput {
   visitorId: string;
 }
 
-/** What the model is told. Every rule here is also enforced in code, so none relies on the model obeying. */
+/**
+ * What the model is told. Some of these rules are enforced in code (the tools are read-only, lists
+ * are capped, amounts arrive as text). The rest are only asked of the model, so the answer is
+ * checked afterwards: a figure that is not in the data it used is flagged (see grounding.ts).
+ */
 function systemPrompt(today: string): string {
   return `You are the pay-insights assistant inside ACME's salary management app. You help the HR Manager understand how the organisation pays its people. Today's date is ${today}.
 
@@ -94,6 +107,9 @@ Rules:
 export function createAssistantService(deps: AssistantDeps) {
   const { failover, tools, limiter, cache, dataVersion, clock } = deps;
 
+  const shorten = (text: string) =>
+    text.length > HISTORY_MESSAGE_CHARS ? `${text.slice(0, HISTORY_MESSAGE_CHARS)}…` : text;
+
   const labelOf = (id: ProviderId) => failover.status().find((p) => p.id === id)?.label ?? id;
 
   async function converse(
@@ -101,12 +117,17 @@ export function createAssistantService(deps: AssistantDeps) {
   ): Promise<Omit<AssistantAnswer, 'cached' | 'remainingThisHour'> & { complete: boolean }> {
     const messages: ChatMessage[] = [
       { role: 'system', content: systemPrompt(clock().toISOString().slice(0, 10)) },
-      ...input.history
-        .slice(-HISTORY_MESSAGES)
-        .map((message): ChatMessage => ({ role: message.role, content: message.content.trim() })),
+      ...input.history.slice(-HISTORY_MESSAGES).map((message): ChatMessage => ({
+        role: message.role,
+        content: shorten(message.content.trim()),
+      })),
       { role: 'user', content: input.question },
     ];
     const sources: string[] = [];
+    // Everything an answer may legitimately quote: the question, the conversation, today's date
+    // and, as they arrive, the tool results.
+    const today = clock().toISOString().slice(0, 10);
+    const evidence: string[] = [today, input.question, ...input.history.map((m) => m.content)];
     let providerId: ProviderId | null = null;
 
     for (let round = 1; round <= MAX_TOOL_ROUNDS; round++) {
@@ -118,15 +139,27 @@ export function createAssistantService(deps: AssistantDeps) {
       const { reply } = result;
 
       if (reply.toolCalls.length === 0) {
+        const text = reply.content ?? GAVE_UP;
+        const unverifiedFigures = findUngroundedFigures(text, evidence);
+        // A cut-off answer must never look finished. Salary figures that stop halfway mislead.
+        // Nor may a figure the data does not contain pass as if it came from the data.
+        const answer =
+          (reply.truncated ? `${text}${CUT_OFF}` : text) +
+          (unverifiedFigures.length > 0
+            ? unverifiedNote(unverifiedFigures, sources.length > 0)
+            : '');
         return {
-          // A cut-off answer must never look finished. Salary figures that stop halfway mislead.
-          answer: reply.truncated ? `${reply.content ?? ''}${CUT_OFF}` : (reply.content ?? GAVE_UP),
+          answer,
           sources,
           provider: providerId,
           providerLabel: labelOf(providerId),
-          complete: !reply.truncated,
+          unverifiedFigures,
+          complete: !reply.truncated && unverifiedFigures.length === 0,
         };
       }
+
+      // The tools of the last round would run, and nobody would ever read their results.
+      if (round === MAX_TOOL_ROUNDS) break;
 
       messages.push({ role: 'assistant', content: reply.content, toolCalls: reply.toolCalls });
       reply.toolCalls.forEach((call, index) => {
@@ -140,6 +173,7 @@ export function createAssistantService(deps: AssistantDeps) {
           return;
         }
         const outcome = tools.run(call.name, call.arguments);
+        evidence.push(outcome.content);
         if (outcome.source && !sources.includes(outcome.source)) sources.push(outcome.source);
         messages.push({ role: 'tool', toolCallId: call.id, content: outcome.content });
       });
@@ -150,6 +184,7 @@ export function createAssistantService(deps: AssistantDeps) {
       sources,
       provider: providerId,
       providerLabel: providerId ? labelOf(providerId) : null,
+      unverifiedFigures: [],
       complete: false,
     };
   }
@@ -190,12 +225,16 @@ export function createAssistantService(deps: AssistantDeps) {
       return { ...answer, cached: false, remainingThisHour: limiter.remaining(input.visitorId) };
     },
 
-    status() {
+    /** `visitorId` is who is asking, so the answer can say how many questions they have left. */
+    status(visitorId?: string) {
       const providers = failover.status();
       return {
         enabled: providers.length > 0,
         providers,
         limits: { perVisitorPerHour: limiter.limits.perVisitorPerHour },
+        remainingThisHour: visitorId
+          ? limiter.remaining(visitorId)
+          : limiter.limits.perVisitorPerHour,
       };
     },
   };

@@ -92,10 +92,10 @@ function setup(
 
 describe('answering a question', () => {
   it('returns the model answer, which provider gave it, and how many questions are left', async () => {
-    const { ask } = setup(aFailover(said('We have 9,598 people.')));
+    const { ask } = setup(aFailover(said('I can help with questions about pay.')));
 
-    expect(await ask('How many people do we have?')).toEqual({
-      answer: 'We have 9,598 people.',
+    expect(await ask('What can you do?')).toEqual({
+      answer: 'I can help with questions about pay.',
       sources: [],
       provider: 'groq',
       providerLabel: 'Groq',

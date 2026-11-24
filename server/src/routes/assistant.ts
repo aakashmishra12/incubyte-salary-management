@@ -19,7 +19,8 @@ const askSchema = z.object({
     .array(
       z.object({
         role: z.enum(['user', 'assistant']),
-        content: z.string().max(2000),
+        // An earlier answer can be about 6,000 characters long, so this must be well above that.
+        content: z.string().max(8000),
       }),
     )
     .max(10)
@@ -70,8 +71,15 @@ function toHttpError(error: unknown, perVisitorPerHour: number | undefined): unk
 export function assistantRoutes(assistant: AssistantService | undefined): Router {
   const router = Router();
 
-  router.get('/status', (_request, response) => {
-    response.json(assistant?.status() ?? { enabled: false, providers: [], limits: null });
+  router.get('/status', (request, response) => {
+    response.json(
+      assistant?.status(visitorKeyFor(request.ip)) ?? {
+        enabled: false,
+        providers: [],
+        limits: null,
+        remainingThisHour: 0,
+      },
+    );
   });
 
   router.post('/ask', async (request, response) => {
