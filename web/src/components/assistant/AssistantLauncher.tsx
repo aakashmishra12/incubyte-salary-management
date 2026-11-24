@@ -19,6 +19,8 @@ import type { AssistantAnswer, AssistantStatus } from '../../api/assistant.ts';
 import { useAskAssistant, useAssistantStatus } from '../../api/queries.ts';
 
 const MAX_QUESTION_LENGTH = 500;
+/** The server refuses anything shorter, so the Send button waits for this many characters. */
+const MIN_QUESTION_LENGTH = 2;
 const HISTORY_MESSAGES = 6;
 
 const EXAMPLE_QUESTIONS = [
@@ -82,10 +84,11 @@ function AssistantPanel({ status, onClose }: { status: AssistantStatus; onClose:
   const [input, setInput] = useState('');
   const [provider, setProvider] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [remaining, setRemaining] = useState<number | null>(null);
   const endOfConversation = useRef<HTMLDivElement>(null);
 
-  const left = remaining ?? status.limits?.perVisitorPerHour ?? 0;
+  // What the server says. It is asked again after every question and every time the panel opens,
+  // so it is right after a reload, and after a refusal for the hourly limit.
+  const left = status.remainingThisHour;
 
   // Keep the newest message in view. (Not every environment can scroll, so check first.)
   useEffect(() => {
@@ -94,8 +97,10 @@ function AssistantPanel({ status, onClose }: { status: AssistantStatus; onClose:
 
   function send(text: string) {
     const question = text.trim();
-    if (!question || ask.isPending) return;
+    if (question.length < MIN_QUESTION_LENGTH || ask.isPending) return;
     setError(null);
+    // The box is emptied at once, so anything typed while waiting is not lost when the answer arrives.
+    setInput('');
 
     const history = items
       .slice(-HISTORY_MESSAGES)
@@ -114,13 +119,11 @@ function AssistantPanel({ status, onClose }: { status: AssistantStatus; onClose:
             { role: 'user', text: question },
             { role: 'assistant', answer },
           ]);
-          setRemaining(answer.remainingThisHour);
-          setInput('');
         },
         onError: (failure) => {
           setError(messageFor(failure));
-          // Nothing the person typed is lost.
-          setInput(question);
+          // The question goes back in the box, unless something else has been typed meanwhile.
+          setInput((current) => (current === '' ? question : current));
         },
       },
     );
@@ -172,7 +175,14 @@ function AssistantPanel({ status, onClose }: { status: AssistantStatus; onClose:
         </TextField>
       </Box>
 
-      <Stack spacing={2} sx={{ flex: 1, overflowY: 'auto', p: 2 }}>
+      {/* A live region: a screen reader reads new answers, the thinking message and errors as they appear. */}
+      <Stack
+        spacing={2}
+        role="log"
+        aria-live="polite"
+        aria-label="Conversation"
+        sx={{ flex: 1, overflowY: 'auto', p: 2 }}
+      >
         {items.length === 0 && !ask.isPending && (
           <Stack spacing={1} sx={{ alignItems: 'flex-start' }}>
             <Typography color="text.secondary" variant="body2">
@@ -219,7 +229,7 @@ function AssistantPanel({ status, onClose }: { status: AssistantStatus; onClose:
           <>
             <Bubble text={ask.variables.question} fromUser />
             <Box>
-              <Typography variant="body2" color="text.secondary">
+              <Typography variant="body2" color="text.secondary" role="status">
                 Thinking…
               </Typography>
               <LinearProgress />
@@ -243,7 +253,10 @@ function AssistantPanel({ status, onClose }: { status: AssistantStatus; onClose:
           onKeyDown={(event) => {
             // Enter sends. Shift+Enter starts a new line. Enter while composing text (for example
             // with an input method for another script) must not send.
-            if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
+            // Some browsers report the Enter that ends composing with keyCode 229 and isComposing
+            // already false, so both are checked.
+            const isComposing = event.nativeEvent.isComposing || event.keyCode === 229;
+            if (event.key === 'Enter' && !event.shiftKey && !isComposing) {
               event.preventDefault();
               send(input);
             }
@@ -257,7 +270,7 @@ function AssistantPanel({ status, onClose }: { status: AssistantStatus; onClose:
           <Button
             variant="contained"
             onClick={() => send(input)}
-            disabled={input.trim() === '' || ask.isPending}
+            disabled={input.trim().length < MIN_QUESTION_LENGTH || ask.isPending}
           >
             Send
           </Button>
@@ -305,6 +318,10 @@ function providerLabel(provider: AssistantStatus['providers'][number]): string {
 
 /** The server's own wording is plain and specific, so it is shown as it is. */
 function messageFor(error: unknown): string {
+  if (error instanceof ApiError && error.status === 400 && error.issues[0]) {
+    const { field, message } = error.issues[0];
+    return `That question could not be sent: ${field}: ${message}.`;
+  }
   if (error instanceof ApiError) {
     return [400, 404, 429, 503].includes(error.status)
       ? error.message

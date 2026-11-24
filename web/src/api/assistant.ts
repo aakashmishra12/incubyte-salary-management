@@ -6,6 +6,8 @@ export interface AssistantStatus {
   enabled: boolean;
   providers: { id: string; label: string; state: ProviderState; availableAgainAt?: string }[];
   limits: { perVisitorPerHour: number } | null;
+  /** How many questions this visitor can still ask this hour. The server counts, not the browser. */
+  remainingThisHour: number;
 }
 
 export interface AssistantAnswer {
@@ -17,6 +19,8 @@ export interface AssistantAnswer {
   /** True when the answer was remembered and no model was used. */
   cached: boolean;
   remainingThisHour: number;
+  /** Figures in the answer that were not in the data it used. The answer text already warns about them. */
+  unverifiedFigures: string[];
 }
 
 export interface AssistantQuestion {
