@@ -128,6 +128,41 @@ describe('employeeRepository.list', () => {
     expect(repository.list(query({ search: '_' })).total).toBe(0);
   });
 
+  it('finds a name with a percent sign, an underscore or a backslash in it, and only that name', () => {
+    const { repository } = aDatabaseWith([
+      anEmployee({ lastName: '100%' }),
+      anEmployee({ lastName: 'a_b' }),
+      anEmployee({ lastName: 'back\\slash' }),
+      anEmployee({ lastName: 'Plain' }),
+    ]);
+
+    const found = (search: string) =>
+      repository.list(query({ search })).items.map((e) => e.lastName);
+
+    expect(found('%')).toEqual(['100%']);
+    expect(found('_')).toEqual(['a_b']);
+    expect(found('\\')).toEqual(['back\\slash']);
+    expect(found('a_b')).toEqual(['a_b']);
+  });
+
+  it('finds a name whatever the case or accents typed, so "jose" finds "José" and "ÉMILIE" finds "Émilie"', () => {
+    const { repository } = aDatabaseWith([
+      anEmployee({ firstName: 'José', lastName: 'Núñez' }),
+      anEmployee({ firstName: 'Émilie', lastName: 'Durand' }),
+      anEmployee({ firstName: 'Kenji', lastName: 'Sato' }),
+    ]);
+
+    const found = (search: string) =>
+      repository.list(query({ search })).items.map((e) => e.lastName);
+
+    expect(found('jose')).toEqual(['Núñez']);
+    expect(found('JOSÉ')).toEqual(['Núñez']);
+    expect(found('nunez')).toEqual(['Núñez']);
+    expect(found('émilie')).toEqual(['Durand']);
+    expect(found('ÉMILIE')).toEqual(['Durand']);
+    expect(found('kenji')).toEqual(['Sato']);
+  });
+
   it('combines a search with a filter', () => {
     const { repository } = aDatabaseWith([
       anEmployee({ lastName: 'Rao', country: 'IN' }),
@@ -160,6 +195,23 @@ describe('employeeRepository.list', () => {
     const newestFirst = repository.list(query({ sort: 'hireDate', order: 'desc' }));
 
     expect(newestFirst.items.map((e) => e.lastName)).toEqual(['B', 'A']);
+  });
+});
+
+describe('employeeRepository.inTransaction', () => {
+  it('undoes every write inside it when something fails, so half a change is never saved', () => {
+    const { db, repository, ids } = aDatabaseWith([anEmployee({ salaryMinor: 100_000_00 })]);
+
+    expect(() =>
+      repository.inTransaction(() => {
+        repository.updateSalary(ids[0]!, 999_00, 'USD', '2026-11-20T09:00:00.000Z');
+        throw new Error('the disk is full');
+      }),
+    ).toThrow('the disk is full');
+
+    expect(db.prepare('SELECT salary_minor FROM employees').get()).toEqual({
+      salary_minor: 100_000_00,
+    });
   });
 });
 
