@@ -2,6 +2,7 @@ import {
   Alert,
   Box,
   Chip,
+  LinearProgress,
   Link,
   MenuItem,
   Paper,
@@ -22,8 +23,10 @@ import { useBreakdown, useOutliers, useOverview, useReference } from '../api/que
 import type { Reference } from '../api/types.ts';
 import { formatDate } from '../format/date.ts';
 import { formatMoney, formatUsd } from '../format/money.ts';
+import { useDocumentTitle } from './useDocumentTitle.ts';
 
 export function InsightsPage() {
+  useDocumentTitle('Insights');
   const reference = useReference();
 
   return (
@@ -51,7 +54,7 @@ function OverviewSection({ reference }: { reference: Reference | undefined }) {
   const overview = useOverview();
 
   return (
-    <Section title="Overview">
+    <Section title="Overview" loadingLabel="Loading the overview" isLoading={overview.isFetching}>
       {overview.isError && <Alert severity="error">The overview could not be loaded.</Alert>}
       {overview.data && (
         <>
@@ -93,7 +96,11 @@ function OverviewSection({ reference }: { reference: Reference | undefined }) {
                       <TableCell>
                         <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
                           {/* A bar whose length is the share, so the eye can compare rows. */}
-                          <Box sx={{ flex: 1, bgcolor: 'divider', borderRadius: 1, height: 8 }}>
+                          <Box
+                            role="img"
+                            aria-label={`${countryName(reference, country.country)}: ${share.toFixed(1)}% of the cost`}
+                            sx={{ flex: 1, bgcolor: 'divider', borderRadius: 1, height: 8 }}
+                          >
                             <Box
                               sx={{
                                 width: `${share}%`,
@@ -136,7 +143,11 @@ function BreakdownSection({ reference }: { reference: Reference | undefined }) {
     breakdown.data?.groupBy === 'country' ? countryName(reference, key) : key;
 
   return (
-    <Section title="Breakdown">
+    <Section
+      title="Breakdown"
+      loadingLabel="Loading the breakdown"
+      isLoading={breakdown.isFetching}
+    >
       <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} sx={{ mb: 2 }}>
         <Choice
           label="Group by"
@@ -240,7 +251,11 @@ function OutliersSection({ reference }: { reference: Reference | undefined }) {
   const unrated = outliers.data?.coverage.unrated ?? 0;
 
   return (
-    <Section title="Pay outliers">
+    <Section
+      title="Pay outliers"
+      loadingLabel="Loading the outliers"
+      isLoading={outliers.isFetching}
+    >
       {rule && (
         <Typography color="text.secondary" sx={{ mb: 2 }}>
           Employees paid below {rule.lowPercent}% or above {rule.highPercent}% of the median for
@@ -353,13 +368,30 @@ function OutliersSection({ reference }: { reference: Reference | undefined }) {
 }
 
 /** A titled panel. The heading names the region, so screen readers can jump between insights. */
-function Section({ title, children }: { title: string; children: ReactNode }) {
+function Section({
+  title,
+  loadingLabel,
+  isLoading,
+  children,
+}: {
+  title: string;
+  /** Read out while the section loads. */
+  loadingLabel: string;
+  /** True while the first load or a refresh is under way. */
+  isLoading: boolean;
+  children: ReactNode;
+}) {
   const headingId = useId();
   return (
     <Paper variant="outlined" component="section" aria-labelledby={headingId} sx={{ p: 2 }}>
       <Typography variant="h6" component="h2" id={headingId} sx={{ mb: 1 }}>
         {title}
       </Typography>
+      {/* Holds its height, so the section does not jump when it starts or stops loading. The old
+          figures stay on screen while new ones load, so this is the only sign they are being refreshed. */}
+      <Box sx={{ height: 4, mb: 1 }}>
+        {isLoading && <LinearProgress aria-label={loadingLabel} />}
+      </Box>
       {children}
     </Paper>
   );

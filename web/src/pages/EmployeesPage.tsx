@@ -25,6 +25,7 @@ import { ApiError } from '../api/client.ts';
 import { useEmployees, useReference } from '../api/queries.ts';
 import { formatDate } from '../format/date.ts';
 import { formatMoney, formatUsd } from '../format/money.ts';
+import { useDocumentTitle } from './useDocumentTitle.ts';
 
 const DEFAULT_PAGE_SIZE = 25;
 const PAGE_SIZES = [10, 25, 50, 100];
@@ -75,6 +76,7 @@ const COLUMNS: { label: string; sort?: string; align?: 'right' }[] = [
 ];
 
 export function EmployeesPage() {
+  useDocumentTitle('Employees');
   // The filters live in the address bar (?country=IN&page=2), not in component state.
   // That makes a view bookmarkable, and the back button undoes a filter.
   const [params, setParams] = useSearchParams();
@@ -279,7 +281,7 @@ export function EmployeesPage() {
                       label={employee.status === 'active' ? 'Active' : 'Left'}
                       variant="outlined"
                       sx={{
-                        color: employee.status === 'active' ? 'text.primary' : 'text.disabled',
+                        color: employee.status === 'active' ? 'text.primary' : 'text.secondary',
                       }}
                     />
                   </TableCell>

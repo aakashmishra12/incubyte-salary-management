@@ -17,6 +17,7 @@ import {
 } from '@mui/material';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useBackToList } from './backToList.ts';
+import { useDocumentTitle } from './useDocumentTitle.ts';
 import { Link as RouterLink, useParams } from 'react-router';
 import { useEmployee, useReference } from '../api/queries.ts';
 import { ChangeSalaryDialog } from '../components/ChangeSalaryDialog.tsx';
@@ -30,6 +31,9 @@ export function EmployeeDetailPage() {
   const { id } = useParams();
   const detail = useEmployee(Number(id));
   const reference = useReference();
+  useDocumentTitle(
+    detail.data ? `${detail.data.employee.firstName} ${detail.data.employee.lastName}` : 'Employee',
+  );
   // Which dialog is open, if any. One piece of state means two can never be open at once.
   const [openDialog, setOpenDialog] = useState<'salary' | 'details' | 'left' | null>(null);
 
@@ -81,7 +85,7 @@ export function EmployeeDetailPage() {
           size="small"
           label={hasLeft ? 'Left' : 'Active'}
           variant="outlined"
-          sx={{ color: hasLeft ? 'text.disabled' : 'text.primary' }}
+          sx={{ color: hasLeft ? 'text.secondary' : 'text.primary' }}
         />
         {!hasLeft && (
           <Stack direction="row" spacing={1} sx={{ ml: 'auto !important' }}>

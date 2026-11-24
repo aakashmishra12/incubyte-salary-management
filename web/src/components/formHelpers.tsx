@@ -24,6 +24,7 @@ export function SelectField(props: {
   onChange: (value: string) => void;
   options: { value: string; label: string }[];
   error?: string;
+  required?: boolean;
 }) {
   return (
     <TextField
@@ -33,6 +34,7 @@ export function SelectField(props: {
       onChange={(event) => props.onChange(event.target.value)}
       error={Boolean(props.error)}
       helperText={props.error}
+      required={props.required}
     >
       {props.options.map((option) => (
         <MenuItem key={option.value} value={option.value}>

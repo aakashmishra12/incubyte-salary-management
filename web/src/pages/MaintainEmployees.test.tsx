@@ -14,19 +14,19 @@ function detailOf(overrides: Partial<EmployeeDetail['employee']> = {}): Employee
 }
 
 async function choose(label: string, option: string) {
-  await userEvent.click(screen.getByLabelText(label));
+  await userEvent.click(screen.getByLabelText(new RegExp(`^${label}`)));
   await userEvent.click(await screen.findByRole('option', { name: option }));
 }
 
 async function fillInNewEmployee() {
-  await userEvent.type(await screen.findByLabelText('First name'), 'Mei');
-  await userEvent.type(screen.getByLabelText('Last name'), 'Tanaka');
-  await userEvent.type(screen.getByLabelText('Email'), 'mei.tanaka@acme.example');
+  await userEvent.type(await screen.findByLabelText(/^First name/), 'Mei');
+  await userEvent.type(screen.getByLabelText(/^Last name/), 'Tanaka');
+  await userEvent.type(screen.getByLabelText(/^Email/), 'mei.tanaka@acme.example');
   await choose('Country', 'Japan');
   await choose('Department', 'Engineering');
   await choose('Level', 'L2');
-  await userEvent.type(screen.getByLabelText('Job title'), 'Software Engineer');
-  fireEvent.change(screen.getByLabelText('Hire date'), { target: { value: '2026-11-03' } });
+  await userEvent.type(screen.getByLabelText(/^Job title/), 'Software Engineer');
+  fireEvent.change(screen.getByLabelText(/^Hire date/), { target: { value: '2026-11-03' } });
   await userEvent.type(screen.getByLabelText(/Starting salary/), '7,000,000');
 }
 
@@ -51,10 +51,10 @@ describe('adding an employee', () => {
     stubApi({ 'GET /api/reference': () => reference });
     renderPage(<App />, { route: '/employees/new' });
 
-    await screen.findByLabelText('Country');
+    await screen.findByLabelText(/^Country/);
     await choose('Country', 'Japan');
 
-    expect(screen.getByLabelText('Starting salary (JPY)')).toBeInTheDocument();
+    expect(screen.getByLabelText(/^Starting salary \(JPY\)/)).toBeInTheDocument();
   });
 
   it('sends the new employee and then opens their page', async () => {
@@ -103,7 +103,7 @@ describe('adding an employee', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Add employee' }));
 
     expect(await screen.findByText('Invalid email address')).toBeInTheDocument();
-    expect(screen.getByLabelText('First name')).toHaveValue('Mei');
+    expect(screen.getByLabelText(/^First name/)).toHaveValue('Mei');
   });
 
   it('shows the reason when the server refuses the employee as a whole', async () => {
@@ -126,7 +126,7 @@ describe('adding an employee', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Add employee' }));
     const requiredBefore = screen.getAllByText('Required').length;
 
-    await userEvent.type(screen.getByLabelText('First name'), 'M');
+    await userEvent.type(screen.getByLabelText(/^First name/), 'M');
 
     // Only the field I touched is cleared. The others still need filling in.
     expect(screen.getAllByText('Required')).toHaveLength(requiredBefore - 1);

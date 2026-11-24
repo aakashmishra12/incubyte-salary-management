@@ -1,11 +1,12 @@
 import { Alert, Box, Button, Link, Paper, Stack, TextField, Typography } from '@mui/material';
-import { useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link as RouterLink, useNavigate } from 'react-router';
 import { useCreateEmployee, useReference } from '../api/queries.ts';
 import { fieldErrorsFrom, formErrorFrom, SelectField } from '../components/formHelpers.tsx';
 import { todayIso } from '../format/date.ts';
 import { parseMoney } from '../format/money.ts';
 import { useBackToList } from './backToList.ts';
+import { useDocumentTitle } from './useDocumentTitle.ts';
 
 const EMPTY_FORM = {
   firstName: '',
@@ -23,12 +24,20 @@ const EMPTY_FORM = {
 type Field = keyof typeof EMPTY_FORM;
 
 export function NewEmployeePage() {
+  useDocumentTitle('Add employee');
   const reference = useReference();
   const create = useCreateEmployee();
   const navigate = useNavigate();
   const backToList = useBackToList();
   const [values, setValues] = useState(EMPTY_FORM);
   const [localErrors, setLocalErrors] = useState<Partial<Record<Field, string>>>({});
+  // After a failed send, keyboard focus goes to the first field that needs attention, so a person
+  // using a keyboard or a screen reader is not left at the button wondering what happened.
+  const form = useRef<HTMLFormElement>(null);
+  const [failedSends, setFailedSends] = useState(0);
+  useEffect(() => {
+    if (failedSends > 0) form.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus();
+  }, [failedSends]);
 
   const set = (field: Field) => (value: string) => {
     setValues({ ...values, [field]: value });
@@ -58,7 +67,10 @@ export function NewEmployeePage() {
       errors.salary = 'Enter an amount such as 85000 or 85,000.50. Commas only group thousands.';
     }
     setLocalErrors(errors);
-    if (Object.keys(errors).length > 0 || salaryMinor === null) return;
+    if (Object.keys(errors).length > 0 || salaryMinor === null) {
+      setFailedSends((count) => count + 1);
+      return;
+    }
 
     create.mutate(
       {
@@ -88,7 +100,7 @@ export function NewEmployeePage() {
       </Typography>
 
       <Paper variant="outlined" sx={{ p: 3 }}>
-        <form onSubmit={submit} noValidate>
+        <form ref={form} onSubmit={submit} noValidate>
           <Stack spacing={2}>
             {formError && <Alert severity="error">{formError}</Alert>}
 
@@ -124,6 +136,7 @@ export function NewEmployeePage() {
                 value={values.country}
                 onChange={set('country')}
                 error={errorFor('country')}
+                required
                 options={(reference.data?.countries ?? []).map((c) => ({
                   value: c.code,
                   label: c.name,
@@ -134,6 +147,7 @@ export function NewEmployeePage() {
                 value={values.department}
                 onChange={set('department')}
                 error={errorFor('department')}
+                required
                 options={(reference.data?.departments ?? []).map((d) => ({ value: d, label: d }))}
               />
               <SelectField
@@ -141,6 +155,7 @@ export function NewEmployeePage() {
                 value={values.level}
                 onChange={set('level')}
                 error={errorFor('level')}
+                required
                 options={(reference.data?.levels ?? []).map((l) => ({ value: l, label: l }))}
               />
               <TextField
@@ -150,6 +165,7 @@ export function NewEmployeePage() {
                 onChange={(event) => set('hireDate')(event.target.value)}
                 error={Boolean(errorFor('hireDate'))}
                 helperText={errorFor('hireDate')}
+                required
                 slotProps={{ inputLabel: { shrink: true }, htmlInput: { max: todayIso() } }}
               />
               <TextInput
@@ -193,6 +209,7 @@ function TextInput(props: {
       error={Boolean(props.error)}
       helperText={props.error ?? props.help}
       disabled={props.disabled}
+      required
     />
   );
 }

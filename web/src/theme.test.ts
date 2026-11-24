@@ -54,7 +54,12 @@ describe('theme: the edges of controls can be seen (WCAG needs 3 to 1)', () => {
 });
 
 describe('theme: the components really use those colours', () => {
-  const overrides = theme.components as Record<string, { styleOverrides?: Record<string, any> }>;
+  /** Reads a value from inside the theme by its path, so the test does not depend on MUI's types. */
+  const inTheme = (...path: string[]) =>
+    path.reduce<unknown>(
+      (value, key) => (value as Record<string, unknown> | undefined)?.[key],
+      theme.components,
+    );
 
   it('uses them for the palette', () => {
     expect(theme.palette.info.main).toBe(tokens.link);
@@ -63,25 +68,31 @@ describe('theme: the components really use those colours', () => {
   });
 
   it('uses the stronger border for inputs', () => {
-    const root = overrides.MuiOutlinedInput!.styleOverrides!.root;
-
-    expect(root['& .MuiOutlinedInput-notchedOutline'].borderColor).toBe(tokens.inputBorder);
+    expect(
+      inTheme(
+        'MuiOutlinedInput',
+        'styleOverrides',
+        'root',
+        '& .MuiOutlinedInput-notchedOutline',
+        'borderColor',
+      ),
+    ).toBe(tokens.inputBorder);
   });
 
   it('uses the readable muted colour for table headings', () => {
-    expect(overrides.MuiTableCell!.styleOverrides!.head.color).toBe(tokens.muted);
+    expect(inTheme('MuiTableCell', 'styleOverrides', 'head', 'color')).toBe(tokens.muted);
   });
 
   it('shows a clear ring around whatever has keyboard focus', () => {
-    const baseline = overrides.MuiCssBaseline!.styleOverrides!;
-
-    expect(baseline[':focus-visible']).toMatchObject({ outline: `2px solid ${tokens.ink}` });
+    expect(inTheme('MuiCssBaseline', 'styleOverrides', ':focus-visible', 'outline')).toBe(
+      `2px solid ${tokens.ink}`,
+    );
   });
 
   it('stops animations for people who ask their system to reduce motion', () => {
-    const baseline = overrides.MuiCssBaseline!.styleOverrides!;
-
-    expect(baseline['@media (prefers-reduced-motion: reduce)']).toBeDefined();
+    expect(
+      inTheme('MuiCssBaseline', 'styleOverrides', '@media (prefers-reduced-motion: reduce)'),
+    ).toBeDefined();
   });
 
   it('sizes text in rem, so the browser font size setting is respected', () => {
